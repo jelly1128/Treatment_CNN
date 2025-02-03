@@ -141,20 +141,20 @@ class ModelEvaluator:
             for i, class_name in enumerate(class_names):
                 csvwriter.writerow([class_name] + [f'{precisions[i]:.4f}', f'{recalls[i]:.4f}', f'{f1_scores[i]:.4f}'])
 
-    def create_confusion_matrix(self, ground_truths: list, predictions: list, n_class: int, mode='detailed'):
+    def create_confusion_matrix(self, ground_truths: list, predictions: list, num_classes: int, mode='detailed'):
         """
         混同行列を出力する関数
         
         Parameters:
         ground_truths (list): 正解ラベル
         predictions (list): modelの予測結果
-        n_class (int): クラス数
+        num_classes (int): クラス数
         mode: 'detailed' (Nクラス) または 'binary' (正常/異常)
         """
         if mode == 'detailed':
             # 15クラスの混同行列の生成
-            class_names = [str(i) for i in range(n_class)]
-            cm = confusion_matrix(ground_truths, predictions, labels=range(n_class))
+            class_names = [str(i) for i in range(num_classes)]
+            cm = confusion_matrix(ground_truths, predictions, labels=range(num_classes))
         
         elif mode == 'binary':
             # 正常と異常の2クラスに変換後，混同行列の生成

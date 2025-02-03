@@ -1,7 +1,4 @@
 import os
-import yaml
-from dataclasses import dataclass
-from typing import Optional
 import argparse
 import random
 import numpy as np
@@ -14,40 +11,42 @@ import torch.optim as optim
 from torch.utils.data import ConcatDataset, DataLoader
 import torchvision.transforms as transforms
 
-from data_transformer import DataTransformer
-from datasets import AnomalyDetectionDataset, TreatmentClassificationDataset, MultiLabelDetectionDataset
-from models import AnomalyDetectionModel, TreatmentClassificationModel, MultiLabelDetectionModel
+from config.config import load_config
+from models import  MultiLabelDetectionModel
 from evaluate import ModelEvaluator
+from utils.torch_utils import get_device_and_num_gpus, set_seed
+from data.dataloader import create_train_val_dataloaders
+from data.datasets import MultiLabelDetectionDataset
 
 SPLIT1 = (
     "20210119093456_000001-001",
-    "20210531112330_000005-001",
-    "20211223090943_000001-002",
-    "20230718-102254-ES06_20230718-102749-es06-hd",
-    "20230802-104559-ES09_20230802-105630-es09-hd",
+    # "20210531112330_000005-001",
+    # "20211223090943_000001-002",
+    # "20230718-102254-ES06_20230718-102749-es06-hd",
+    # "20230802-104559-ES09_20230802-105630-es09-hd",
 )
 
 SPLIT2 = (
     "20210119093456_000001-002",
-    "20210629091641_000001-002",
-    "20211223090943_000001-003",
-    "20230801-125025-ES06_20230801-125615-es06-hd",
-    "20230803-110626-ES06_20230803-111315-es06-hd"
+    # "20210629091641_000001-002",
+    # "20211223090943_000001-003",
+    # "20230801-125025-ES06_20230801-125615-es06-hd",
+    # "20230803-110626-ES06_20230803-111315-es06-hd"
 )
 
 SPLIT3 = (
     "20210119093456_000002-001",
-    "20210630102301_000001-002",
-    "20220322102354_000001-002",
-    "20230802-095553-ES09_20230802-101030-es09-hd",
-    "20230803-093923-ES09_20230803-094927-es09-hd",
+    # "20210630102301_000001-002",
+    # "20220322102354_000001-002",
+    # "20230802-095553-ES09_20230802-101030-es09-hd",
+    # "20230803-093923-ES09_20230803-094927-es09-hd",
 )
 
 SPLIT4 = (
     "20210524100043_000001-001",
-    "20210531112330_000001-001",
-    "20211021093634_000001-001",
-    "20211021093634_000001-003"
+    # "20210531112330_000001-001",
+    # "20211021093634_000001-001",
+    # "20211021093634_000001-003"
 )
 
 FOLD1 = (SPLIT1, SPLIT2, SPLIT3)
@@ -57,64 +56,8 @@ FOLD4 = (SPLIT4, SPLIT1, SPLIT2)
 
 NOW_FOLD = FOLD1
 
-@dataclass
-class TrainingConfig:
-    mode: str
-    img_size: int
-    n_class: int
-    pretrain: bool
-    freeze_backbone: bool
-    learning_rate: float
-    batch_size: int
-    max_epoch_num: int
-    
-    # 動的に追加できるように属性を追加
-    def __init__(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
-
-@dataclass
-class PathConfig:
-    root: str
-    save_name: str
-
-@dataclass
-class Config:
-    training: TrainingConfig
-    paths: PathConfig
-
-def load_config(config_path: str) -> Config:
-    with open(config_path, 'r') as f:
-        config_dict = yaml.safe_load(f)
-    
-    training_config = TrainingConfig(**config_dict['training'])
-    path_config = PathConfig(**config_dict['paths'])
-    
-    return Config(training=training_config, paths=path_config)
-
-def setup_device():
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-        num_gpus = torch.cuda.device_count()
-        print(f"Using {num_gpus} GPU{'s' if num_gpus > 1 else ''}")
-    else:
-        device = torch.device("cpu")
-        num_gpus = 0
-        print("Using CPU")
-    
-    print("Device being used:", device)
-    return device, num_gpus
-
-def setup_seed(seed):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
     
 def setup_data(config):
-    # olympus_data_transforms = DataTransformer.get_olympus_transforms(config.training.img_size)
-    # fujifilm_data_transforms = DataTransformer.get_fujifilm_transforms(config.training.img_size)
     train_data_transforms = transforms.Compose([
         transforms.RandomRotation(degrees=360),
         transforms.ToTensor(),
@@ -124,39 +67,19 @@ def setup_data(config):
         transforms.ToTensor(),
         ])
     
-    if config.training.mode =='anomaly_detection':
-        # olympus_train_datasets = MultiLabelDetectionDataset(os.path.join(config.paths.root, 'train', 'olympus'), 
-        #                                                     transform=olympus_data_transforms['train_val'], 
-        #                                                     n_class=config.training.n_class)
-        # fujifilm_train_datasets = MultiLabelDetectionDataset(os.path.join(config.paths.root, 'train', 'fujifilm'), 
-        #                                                   transform=fujifilm_data_transforms['train_val'], 
-        #                                                   n_class=config.training.n_class)
-        # train_datasets = ConcatDataset([olympus_train_datasets, fujifilm_train_datasets])
-        
-        # olympus_val_datasets = MultiLabelDetectionDataset(os.path.join(config.paths.root, 'val', 'olympus'), 
-        #                                                transform=olympus_data_transforms['train_val'], 
-        #                                                n_class=config.training.n_class)
-        # fujifilm_val_datasets = MultiLabelDetectionDataset(os.path.join(config.paths.root, 'val', 'fujifilm'), 
-        #                                                 transform=fujifilm_data_transforms['train_val'], 
-        #                                                 n_class=config.training.n_class)
-        # val_datasets = ConcatDataset([olympus_val_datasets, fujifilm_val_datasets])
-        
-        train_datasets_list = []
-        for split in [NOW_FOLD[0], NOW_FOLD[1]]:
-            dataset = MultiLabelDetectionDataset(config.paths.root, 
-                                                 transform=train_data_transforms, 
-                                                 n_class=config.training.n_class,
-                                                 split=split)
-            train_datasets_list.append(dataset)
-        train_datasets = ConcatDataset(train_datasets_list)
-            
-        val_datasets = MultiLabelDetectionDataset(config.paths.root, 
-                                                  transform=val_data_transforms, 
-                                                  n_class=config.training.n_class,
-                                                  split=NOW_FOLD[2])
+    train_datasets_list = []
+    for split in [NOW_FOLD[0], NOW_FOLD[1]]:
+        dataset = MultiLabelDetectionDataset(config.paths.root,
+                                             transform=train_data_transforms,
+                                             num_classes=config.training.num_classes,
+                                             split=split)
+        train_datasets_list.append(dataset)
+    train_datasets = ConcatDataset(train_datasets_list)
+    val_datasets = MultiLabelDetectionDataset(config.paths.root,
+                                             transform=val_data_transforms,
+                                             num_classes=config.training.num_classes,
+                                             split=NOW_FOLD[2])
     
-    else:
-        raise ValueError("Invalid dataset_type.")
     return train_datasets, val_datasets
 
 def plot_dataset_samples(dataloader):
@@ -167,14 +90,12 @@ def plot_dataset_samples(dataloader):
     for i, (images, img_names, labels) in enumerate(dataloader):
         if i >= 1:  # 1バッチだけ処理
             break
-        
         for j in range(num_samples_to_show):
             ax = axes[j]
             img = images[j].permute(1, 2, 0).numpy()  # CHW to HWC, tensor to numpy
             ax.imshow(img)
             ax.set_title(f"Label: {labels[j]}")
             ax.axis('off')
-            
             print(f"Image path: {img_names[j]}, Label: {labels[j]}")
 
     plt.tight_layout()
@@ -209,39 +130,26 @@ def show_dataset_stats(dataloader):
 
 def train_val(config):
     # setup
-    device, num_gpus = setup_device()
-    setup_seed(42)
+    device, num_gpus = get_device_and_num_gpus()
+    set_seed(42)
     train_datasets, val_datasets = setup_data(config)
     
-    batch_size = config.training.batch_size * num_gpus
-    train_dataloader = DataLoader(train_datasets, batch_size=batch_size, shuffle=True, num_workers=4 * num_gpus)
-    val_dataloader = DataLoader(val_datasets, batch_size=batch_size, shuffle=False, num_workers=4 * num_gpus)
+    train_dataloader, val_dataloaders = create_train_val_dataloaders(config, NOW_FOLD, num_gpus)
     
     print(len(train_datasets))
     print(len(val_datasets))
     
     # debug
-    # plot_dataset_samples(train_dataloader)
+    plot_dataset_samples(train_dataloader)
     # show_dataset_stats(train_dataloader)
-    # os._exit(0)
+    os._exit(0)
     
-    if config.training.mode =='anomaly_detection':
-        model = MultiLabelDetectionModel(n_class=config.training.n_class, 
-                                      pretrain=config.training.pretrain, 
-                                      freeze_backbone=config.training.freeze_backbone)
-    elif config.training.mode =='treatment_classification':
-        model = TreatmentClassificationModel(n_class=config.training.n_class,
-                                             n_image=config.training.n_image,
-                                             pretrain=config.training.pretrain, 
-                                             freeze_backbone=config.training.freeze_backbone,
-                                             hidden_size=config.training.hidden_size,
-                                             n_lstm=config.training.n_lstm
-                                             )
-    else:
-        raise ValueError("Invalid mode.")
+    model = MultiLabelDetectionModel(num_classes=config.training.num_classes,
+                                     pretrained=config.training.pretrained,
+                                     freeze_backbone=config.training.freeze_backbone)
     
     if num_gpus > 1:
-        model = nn.DataParallel(model)  
+        model = nn.DataParallel(model)  # モデルを複数GPUで学習する場合
     model = model.to(device)
     
     print(f'Training {config.training.mode} model')
@@ -289,9 +197,6 @@ def train_val(config):
                 outputs = model(images)
                 loss = criterion(outputs, labels)  # ラベルと比較
                 
-                inputlabels = labels
-                outputlabels = outputs
-                
                 validation_loss += loss.item()
         
         avg_validation_loss = validation_loss / len(val_dataloader)
@@ -334,8 +239,8 @@ def main():
         config.training.max_epoch_num = args.max_epoch_num
         
     # 結果保存folderを作成
-    if not os.path.exists(os.path.join(config.paths.save_name)):
-        os.mkdir(os.path.join(config.paths.save_name))
+    if not os.path.exists(os.path.join(config.paths.save_dir)):
+        os.makedirs(config.paths.save_dir, exist_ok=True)
     
     # Use the config in your code
     train_val(config)

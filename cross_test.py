@@ -71,7 +71,7 @@ TEST_SPLIT = SPLIT3
 class TestConfig:
     mode: str
     img_size: int
-    n_class: int
+    num_classes: int
     # 動的に追加できるように属性を追加
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
@@ -247,7 +247,7 @@ def test_anomaly_detection_model(config):
     device, num_gpus = setup_device()
     setup_seed(42)
     
-    model = MultiLabelDetectionModel(n_class=config.test.n_class)
+    model = MultiLabelDetectionModel(num_classes=config.test.num_classes)
     if num_gpus > 1:
         model = nn.DataParallel(model)
     model = model.to(device)
@@ -293,7 +293,7 @@ def test_anomaly_detection_model(config):
         if not os.path.exists(os.path.join(config.paths.save_name, folder_name)):
             os.mkdir(os.path.join(config.paths.save_name, folder_name))
         
-        test_dataset = MultiLabelDetectionDatasetForTest(os.path.join(config.paths.root), folder_name, data_transform, config.test.n_class)
+        test_dataset = MultiLabelDetectionDatasetForTest(os.path.join(config.paths.root), folder_name, data_transform, config.test.num_classes)
         
         test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=4 * num_gpus)
         
@@ -336,7 +336,7 @@ def test_anomaly_detection_model(config):
             writer = csv.writer(file)
             
             # ヘッダーを定義（クラス数に応じた列名）
-            header = ['Image_Path'] + [f"Class_{i}_Prob" for i in range(config.test.n_class)] + [f"Class_{i}_Label" for i in range(config.test.n_class)]
+            header = ['Image_Path'] + [f"Class_{i}_Prob" for i in range(config.test.num_classes)] + [f"Class_{i}_Label" for i in range(config.test.num_classes)]
             writer.writerow(header)
             
             # 各画像のパスとそれに対応する確率・ラベルを1行ずつ書く
@@ -358,7 +358,7 @@ def test_anomaly_detection_model(config):
             writer = csv.writer(file)
             
             # ヘッダーを定義
-            header = ['Image_Path'] + [f"Pred_Class_{i}" for i in range(config.test.n_class)] + [f"True_Class_{i}" for i in range(config.test.n_class)]
+            header = ['Image_Path'] + [f"Pred_Class_{i}" for i in range(config.test.num_classes)] + [f"True_Class_{i}" for i in range(config.test.num_classes)]
             writer.writerow(header)
             
             # 予測ラベルと正解ラベルを1行ずつ書く
@@ -382,7 +382,7 @@ def test_anomaly_detection_model(config):
             conf_matrix_writer.writerow(['Class', 'TP', 'FP', 'TN', 'FN'])
 
             # 各クラスごとに計算
-            for class_idx in range(config.test.n_class):
+            for class_idx in range(config.test.num_classes):
                 true_labels = [label[class_idx] for label in subfolder_labels]  # 該当クラスの真のラベル
                 pred_class_labels = pred_labels[:, class_idx]  # 50%閾値での予測ラベル
                 
@@ -413,15 +413,15 @@ def test_anomaly_detection_model(config):
                 
         # サブフォルダごとの処理の最後にタイムラインの可視化を追加
         # DataFrameの生成
-        columns_predicted = [f"Predicted_Class_{i}" for i in range(config.test.n_class)]
-        columns_labels = [f"Label_Class_{i}" for i in range(config.test.n_class)]
+        columns_predicted = [f"Predicted_Class_{i}" for i in range(config.test.num_classes)]
+        columns_labels = [f"Label_Class_{i}" for i in range(config.test.num_classes)]
         df = pd.DataFrame(
             data=np.hstack([pred_labels, np.array(subfolder_labels)]),
             columns=columns_predicted + columns_labels
         )
         df['Image_Path'] = subfolder_image_paths  # 画像パスを追加
         
-        def visualize_multilabel_timeline(df, save_dir, filename, n_class):
+        def visualize_multilabel_timeline(df, save_dir, filename, num_classes):
             # Define the colors for each class
             label_colors = {
                 0: (254, 195, 195),       # white
@@ -443,7 +443,7 @@ def test_anomaly_detection_model(config):
             
             # Set timeline height based on the number of labels
             timeline_width = n_images
-            timeline_height = n_class * (n_images // 10)
+            timeline_height = num_classes * (n_images // 10)
 
             # Create a blank image for the timeline
             timeline_image = Image.new('RGB', (timeline_width, timeline_height), (255, 255, 255))
@@ -540,7 +540,7 @@ def test_anomaly_detection_model(config):
             df=df,
             save_dir=os.path.join(config.paths.save_name, folder_name),
             filename="predicted",
-            n_class=config.test.n_class
+            num_classes=config.test.num_classes
         )
 
         visualize_ground_truth_timeline(
@@ -564,7 +564,7 @@ def test_anomaly_detection_model(config):
     #         test_dataset = MultiLabelDetectionDatasetForTest(os.path.join(config.paths.root, maker), 
     #                                                       subfolder_name, 
     #                                                       data_transform,
-    #                                                       config.test.n_class)
+    #                                                       config.test.num_classes)
     #                                                     #   15)
     #         test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=4 * num_gpus)
                         
@@ -609,7 +609,7 @@ def test_anomaly_detection_model(config):
     #             writer = csv.writer(file)
                 
     #             # ヘッダーを定義（クラス数に応じた列名）
-    #             header = ['Image_Path'] + [f"Class_{i}_Prob" for i in range(config.test.n_class)] + [f"Class_{i}_Label" for i in range(config.test.n_class)]
+    #             header = ['Image_Path'] + [f"Class_{i}_Prob" for i in range(config.test.num_classes)] + [f"Class_{i}_Label" for i in range(config.test.num_classes)]
     #             writer.writerow(header)
                 
     #             # 各画像のパスとそれに対応する確率・ラベルを1行ずつ書く
@@ -643,7 +643,7 @@ def test_anomaly_detection_model(config):
 
             #     best_thresholds = []
                 
-            #     for class_idx in range(config.test.n_class):
+            #     for class_idx in range(config.test.num_classes):
             #         true_labels = [label[class_idx] for label in subfolder_labels]  # 該当クラスの真のラベル
             #         pred_probs = [float(prob[class_idx]) for prob in subfolder_probabilities]  # 該当クラスの予測確率
 
@@ -684,7 +684,7 @@ def test_anomaly_detection_model(config):
             #     writer = csv.writer(file)
                 
             #     # ヘッダーを定義
-            #     header = ['Image_Path'] + [f"Pred_Class_{i}" for i in range(config.test.n_class)] + [f"True_Class_{i}" for i in range(config.test.n_class)]
+            #     header = ['Image_Path'] + [f"Pred_Class_{i}" for i in range(config.test.num_classes)] + [f"True_Class_{i}" for i in range(config.test.num_classes)]
             #     writer.writerow(header)
                 
             #     # 予測ラベルと正解ラベルを1行ずつ書く
@@ -708,7 +708,7 @@ def test_anomaly_detection_model(config):
             #     conf_matrix_writer.writerow(['Class', 'TP', 'FP', 'TN', 'FN'])
 
             #     # 各クラスごとに計算
-            #     for class_idx in range(config.test.n_class):
+            #     for class_idx in range(config.test.num_classes):
             #         true_labels = [label[class_idx] for label in subfolder_labels]  # 該当クラスの真のラベル
             #         pred_class_labels = pred_labels[:, class_idx]  # 50%閾値での予測ラベル
                     
@@ -739,15 +739,15 @@ def test_anomaly_detection_model(config):
                     
             # # サブフォルダごとの処理の最後にタイムラインの可視化を追加
             # # DataFrameの生成
-            # columns_predicted = [f"Predicted_Class_{i}" for i in range(config.test.n_class)]
-            # columns_labels = [f"Label_Class_{i}" for i in range(config.test.n_class)]
+            # columns_predicted = [f"Predicted_Class_{i}" for i in range(config.test.num_classes)]
+            # columns_labels = [f"Label_Class_{i}" for i in range(config.test.num_classes)]
             # df = pd.DataFrame(
             #     data=np.hstack([pred_labels, np.array(subfolder_labels)]),
             #     columns=columns_predicted + columns_labels
             # )
             # df['Image_Path'] = subfolder_image_paths  # 画像パスを追加
             
-            # def visualize_multilabel_timeline(df, save_dir, filename, n_class):
+            # def visualize_multilabel_timeline(df, save_dir, filename, num_classes):
             #     # Define the colors for each class
             #     label_colors = {
             #         0: (254, 195, 195),       # white
@@ -769,7 +769,7 @@ def test_anomaly_detection_model(config):
                 
             #     # Set timeline height based on the number of labels
             #     timeline_width = n_images
-            #     timeline_height = n_class * (n_images // 10)
+            #     timeline_height = num_classes * (n_images // 10)
 
             #     # Create a blank image for the timeline
             #     timeline_image = Image.new('RGB', (timeline_width, timeline_height), (255, 255, 255))
@@ -866,7 +866,7 @@ def test_anomaly_detection_model(config):
             #     df=df,
             #     save_dir=os.path.join(config.paths.save_name, subfolder_name),
             #     filename="predicted",
-            #     n_class=config.test.n_class
+            #     num_classes=config.test.num_classes
             # )
 
             # visualize_ground_truth_timeline(
@@ -885,7 +885,7 @@ def test_treatment_classification_model(config):
     device, num_gpus = setup_device()
     setup_seed(42)
     
-    model = TreatmentClassificationModel(n_class=config.test.n_class,
+    model = TreatmentClassificationModel(num_classes=config.test.num_classes,
                                          n_image=config.test.n_image,
                                          hidden_size=config.test.hidden_size,
                                          n_lstm=config.test.n_lstm

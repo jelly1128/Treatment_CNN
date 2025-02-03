@@ -1,0 +1,13 @@
+training:
+  mode: anomaly_detection
+  img_size: 224
+  n_class: 6
+  pretrain: True
+  freeze_backbone: False
+  learning_rate: 1e-4
+  batch_size: 16
+  max_epoch_num: 15
+
+paths:
+  root: '/home/tanaka/demo_data'
+  save_name: 'multilabel_cross_valid_6class_fold1'

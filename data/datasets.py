@@ -1,11 +1,8 @@
 import os
-import glob
 from PIL import Image
 from torch.utils.data import Dataset
-from typing import List, Tuple, Dict
-import re
+from typing import Tuple, List, Dict
 import csv
-from pathlib import Path
 import torch
 from torchvision.utils import make_grid
 import matplotlib.pyplot as plt
@@ -109,8 +106,8 @@ class BaseDataset(Dataset):
     
     
 class AnomalyDetectionDataset(BaseDataset):
-    def __init__(self, root_dir: str, transform, n_class: int):
-        self.n_class = n_class
+    def __init__(self, root_dir: str, transform, num_classes: int):
+        self.num_classes = num_classes
         super().__init__(root_dir, transform)
         
     def _load_data(self):
@@ -118,7 +115,7 @@ class AnomalyDetectionDataset(BaseDataset):
         異常検出用のデータ読み込み
         """
         # 各サブフォルダに対応するcsvファイルを読み込み，画像パスとラベルを辞書に格納する
-        if self.n_class == 2:  # 2値分類（正常/異常）
+        if self.num_classes == 2:  # 2値分類（正常/異常）
             for subfolder_name in self.subfolder_names:
                 with open(f'{self.root_dir}/{subfolder_name}.csv', mode='r') as file:
                     reader = csv.reader(file)
@@ -128,7 +125,7 @@ class AnomalyDetectionDataset(BaseDataset):
                         label = 0 if original_label < TREATMENT_CLASS else 1
                         self.img_dict[os.path.join(subfolder_name, row[0])] = label
                         
-        elif self.n_class == 4: # 正常4クラス(時系列無し処置分類)
+        elif self.num_classes == 4: # 正常4クラス(時系列無し処置分類)
             # 各サブフォルダに対応するcsvファイルを読み込み，画像パスとラベルを辞書に格納する
             for subfolder_name in self.subfolder_names:
                 with open(f'{self.root_dir}/{subfolder_name}.csv', mode='r') as file:
@@ -139,7 +136,7 @@ class AnomalyDetectionDataset(BaseDataset):
                         if label < TREATMENT_CLASS:
                             self.img_dict[os.path.join(subfolder_name, row[0])] = label
                             
-        elif self.n_class == 5: # 正常4クラス/異常1クラス
+        elif self.num_classes == 5: # 正常4クラス/異常1クラス
             # 各サブフォルダに対応するcsvファイルを読み込み，画像パスとラベルを辞書に格納する
             for subfolder_name in self.subfolder_names:
                 with open(f'{self.root_dir}/{subfolder_name}.csv', mode='r') as file:
@@ -325,7 +322,7 @@ class BaseDatasetForTest(Dataset):
 
     
 class AnomalyDetectionDatasetForTest(Dataset):
-    def __init__(self, root_path: str, test_dir: str, transform, n_class: int):
+    def __init__(self, root_path: str, test_dir: str, transform, num_classes: int):
         
         """
         基本的なテスト用データセットクラスの初期化
@@ -341,7 +338,7 @@ class AnomalyDetectionDatasetForTest(Dataset):
         異常検出用のデータ読み込み
         """
         # 各サブフォルダに対応するcsvファイルを読み込み，画像ファイル名とラベルを辞書に格納する
-        if n_class == 2:  # 2値分類（正常/異常）
+        if num_classes == 2:  # 2値分類（正常/異常）
             with open(f'{root_path}/{test_dir}.csv', mode='r') as file:
                 reader = csv.reader(file)
                 for row in reader:
@@ -350,7 +347,7 @@ class AnomalyDetectionDatasetForTest(Dataset):
                     label = 0 if original_label < TREATMENT_CLASS else 1
                     self.img_dict[row[0]] = label
                         
-        elif n_class == 4: # 正常4クラス(時系列無し処置分類)
+        elif num_classes == 4: # 正常4クラス(時系列無し処置分類)
             # 各サブフォルダに対応するcsvファイルを読み込み，画像パスとラベルを辞書に格納する
             with open(f'{root_path}/{test_dir}.csv', mode='r') as file:
                 reader = csv.reader(file)
@@ -360,7 +357,7 @@ class AnomalyDetectionDatasetForTest(Dataset):
                     if label < TREATMENT_CLASS:
                         self.img_dict[row[0]] = label
                             
-        elif n_class == 5: # 正常4クラス/異常1クラス
+        elif num_classes == 5: # 正常4クラス/異常1クラス
             # 各サブフォルダに対応するcsvファイルを読み込み，画像パスとラベルを辞書に格納する
             with open(f'{root_path}/{test_dir}.csv', mode='r') as file:
                 reader = csv.reader(file)
@@ -426,71 +423,42 @@ class TreatmentClassificationDatasetForTest(Dataset):
 
 
 class MultiLabelDetectionDataset(Dataset):
-    def __init__(self, root_dir: str, transform, n_class: int, split: tuple):
-        
+    def __init__(self, root_dir: str, transform: callable, num_classes: int, split: tuple) -> None:
         """
-        基本的なテスト用データセットクラスの初期化
-        
-        :param root_dir: データセットのルートディレクトリ    ex) data/test/olympus
-        :param transform: 画像変換用の関数（オプション）
+        Initialize a basic dataset class for testing purposes.
+
+        Args:
+            root_dir (str): The root directory of the dataset.
+            transform (Callable): An optional function to transform the images.
+            num_classes (int): The number of classes in the dataset.
+            split (tuple): A tuple of strings representing the names of the subfolders
+                in the root directory.
         """
-        self.root_dir = os.path.join(root_dir)
-        self.img_dict = {}               # 画像ファイル名とラベルを格納する辞書
+        self.root_dir = root_dir
         self.transform = transform
-        self.n_class = n_class
-        
-        # ルートディレクトリ下のサブフォルダ名のリストを取得
-        # self.subfolder_names = [name for name in os.listdir(root_dir) if os.path.isdir(os.path.join(root_dir, name))]
-        self.subfolder_names = [name for name in split if os.path.isdir(os.path.join(root_dir, name))]
-        print(self.subfolder_names)
-        """
-        異常検出用のデータ読み込み
-        """
-        # 各サブフォルダに対応するcsvファイルを読み込み，画像ファイル名とラベルを辞書に格納する
-        for subfolder_name in self.subfolder_names:
-            with open(f'{self.root_dir}/{subfolder_name}.csv', mode='r') as file:
+        self.num_classes = num_classes
+        self.split = split
+
+        self.img_dict = {}  # A dictionary to store image file names and labels.
+
+        # Read the CSV files in each subfolder and store the image file names and labels.
+        for subfolder in self.split:
+            with open(os.path.join(self.root_dir, subfolder + '.csv'), 'r') as file:
                 reader = csv.reader(file)
                 for row in reader:
-                    labels = [int(label) for label in row[1:] if label.strip().isdigit()]
-                    
-                    if n_class == 6:
-                    # 0～5のクラスデータのみを使用
+                    labels = [int(label) for label in row[1:] if label.isdigit()]
+
+                    if self.num_classes == 6:
+                        # Use only the labels from 0 to 5.
                         labels = [label for label in labels if 0 <= label <= 5]
-                        
-                    elif n_class == 7:
-                    # 無効フレームのラベルをすべて6に置き換える
+                    elif self.num_classes == 7:
+                        # Replace the labels from 6 to 14 with 6.
                         labels = [6 if 6 <= label <= 14 else label for label in labels]
-                        
-                    labels.sort()  # 昇順にソート
-                    # print(row, labels)
-                    self.img_dict[os.path.join(subfolder_name, row[0])] = labels
-                    
-                    """
-                    前コード
-                    """
-                    # 処置4クラス+体外2クラス(+無効フレーム9クラス)
-                    # labels = [int(label) for label in row[1:] if label.strip().isdigit()]
-                    # labels.sort()  # ここで昇順にソート
-                    # # print(row, labels)
-                    # self.img_dict[os.path.join(subfolder_name, row[0])] = labels
-                    
-                    # 無効フレームのラベルをすべて6に置き換える(5,6入れ替え後)
-                    # 処置4クラス+体外2クラス(+無効フレーム1クラス)
-                    # labels = [int(label) for label in row[1:] if label.strip().isdigit()]
-                    # # 無効フレームのラベルをすべて6に置き換える
-                    # labels = [6 if 6 <= label <= 14 else label for label in labels]
-                    # labels.sort()  # ここで昇順にソート
-                    # self.img_dict[os.path.join(subfolder_name, row[0])] = labels
-                    
-                    # 処置4クラス+体外2クラス(5,6入れ替え後)
-                    # 0～5のクラスデータのみを使用
-                    # labels = [int(label) for label in row[1:] if label.strip().isdigit()]
-                    # filtered_labels = [label for label in labels if 0 <= label <= 5]
-                    # filtered_labels.sort()  # 昇順にソート
-                    # # print(row, filtered_labels)
-                    # self.img_dict[os.path.join(subfolder_name, row[0])] = filtered_labels
+
+                    labels.sort()  # Sort the labels in ascending order.
+                    self.img_dict[os.path.join(subfolder, row[0])] = labels
     
-    def __len__(self):
+    def __len__(self) -> int:
         """データセットの長さを返す"""
         return len(self.img_dict)
     
@@ -502,7 +470,6 @@ class MultiLabelDetectionDataset(Dataset):
         :return: (画像テンソル, 画像パス, ラベル)のタプル
         """
         img_names = list(self.img_dict.keys())
-        # img_path = img_names[idx]
         img_path = os.path.join(self.root_dir, img_names[idx])
         labels = self.img_dict[img_names[idx]]
 
@@ -512,7 +479,7 @@ class MultiLabelDetectionDataset(Dataset):
             image = self.transform(image)
             
         # ラベルをone-hotエンコード形式に変換
-        one_hot_label = torch.zeros(self.n_class)  # n_class次元のzeroベクトルを作成
+        one_hot_label = torch.zeros(self.num_classes)  # num_classes次元のzeroベクトルを作成
         for label in labels:
             one_hot_label[label] = 1  # 該当するラベルのインデックスを1にセット
             
@@ -522,7 +489,7 @@ class MultiLabelDetectionDataset(Dataset):
     
     
 class MultiLabelDetectionDatasetForTest(Dataset):
-    def __init__(self, root_path: str, test_dir: str, transform, n_class: int):
+    def __init__(self, root_path: str, test_dir: str, transform, num_classes: int):
         
         """
         基本的なテスト用データセットクラスの初期化
@@ -533,7 +500,7 @@ class MultiLabelDetectionDatasetForTest(Dataset):
         self.test_dir_path = os.path.join(root_path, test_dir)
         self.img_dict = {}               # 画像ファイル名とラベルを格納する辞書
         self.transform = transform
-        self.n_class = n_class
+        self.num_classes = num_classes
         # print(f"test_dir_path {self.test_dir_path}")
         
         with open(f'{root_path}/{test_dir}.csv', mode='r') as file:
@@ -541,11 +508,11 @@ class MultiLabelDetectionDatasetForTest(Dataset):
             for row in reader:
                 labels = [int(label) for label in row[1:] if label.strip().isdigit()]
                     
-                if n_class == 6:
+                if num_classes == 6:
                 # 0～5のクラスデータのみを使用
                     labels = [label for label in labels if 0 <= label <= 5]
                     
-                elif n_class == 7:
+                elif num_classes == 7:
                 # 無効フレームのラベルをすべて6に置き換える
                     labels = [6 if 6 <= label <= 14 else label for label in labels]
                     
@@ -598,7 +565,7 @@ class MultiLabelDetectionDatasetForTest(Dataset):
             image = self.transform(image)
             
         # ラベルをone-hotエンコード形式に変換
-        one_hot_label = torch.zeros(self.n_class)  # n_class次元のzeroベクトルを作成
+        one_hot_label = torch.zeros(self.num_classes)  # num_classes次元のzeroベクトルを作成
         for label in labels:
             one_hot_label[label] = 1  # 該当するラベルのインデックスを1にセット
             

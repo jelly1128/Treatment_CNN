@@ -75,7 +75,7 @@ def apply_sliding_window(data, method, window_size):
 #         labels=data["Smoothed_Label"].values,
 #         save_dir=output_dir,
 #         filename=f"{method}_pred_max_labels",
-#         n_class=6
+#         num_classes=6
 #     )
     
 # メトリクス計算
@@ -154,13 +154,13 @@ def process_and_evaluate(input_csv, output_dir, window_size=31):
         labels=data["Smoothed_Label"].values,
         save_dir=output_dir,
         filename=f"{method}_pred_max_labels",
-        n_class=6
+        num_classes=6
     )
     
     return overall_cm
     
 # タイムラインの可視化関数
-def visualize_timeline(labels, save_dir, filename, n_class):
+def visualize_timeline(labels, save_dir, filename, num_classes):
     """
     マルチラベルタイムラインを可視化して保存
     """

@@ -1,7 +1,7 @@
 test:
   mode: anomaly_detection
   img_size: 224
-  n_class: 6
+  num_classes: 6
 
 paths:
   root: '/home/tanaka/demo_data'

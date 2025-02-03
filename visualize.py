@@ -4,7 +4,7 @@ import os
 from PIL import Image, ImageDraw
 
 # タイムラインの可視化関数
-def visualize_multilabel_timeline(df, save_dir, filename, n_class):
+def visualize_multilabel_timeline(df, save_dir, filename, num_classes):
     """
     マルチラベルタイムラインを可視化して保存
     """
@@ -92,7 +92,7 @@ def process_and_visualize(input_dir, output_dir, class_num=6):
             df=smoothed_data,
             save_dir=output_dir,
             filename=method,
-            n_class=class_num
+            num_classes=class_num
         )
         
 
@@ -139,14 +139,14 @@ def main():
             #     df=data,
             #     save_dir=output_dir,
             #     filename="predicted",
-            #     n_class=class_num
+            #     num_classes=class_num
             # )
             
             # visualize_multilabel_timeline(
             #     df=smoothed_data,
             #     save_dir=output_dir,
             #     filename=method,
-            #     n_class=class_num
+            #     num_classes=class_num
             # )
             
 

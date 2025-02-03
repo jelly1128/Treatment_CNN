@@ -65,21 +65,21 @@ def process_predictions(input_csv_path, output_dir, prob_column_range=(0, 5)):
         labels=data["Predicted_Label"].values,
         save_dir=output_dir,
         filename="pred_max_labels",
-        n_class=prob_column_range[1] - prob_column_range[0] + 1
+        num_classes=prob_column_range[1] - prob_column_range[0] + 1
     )
     
     visualize_timeline(
         labels=data["True_Label"].values,
         save_dir=output_dir,
         filename="ground_truth",
-        n_class=prob_column_range[1] - prob_column_range[0] + 1
+        num_classes=prob_column_range[1] - prob_column_range[0] + 1
     )
     
     return cm
         
     
 # タイムラインの可視化関数
-def visualize_timeline(labels, save_dir, filename, n_class):
+def visualize_timeline(labels, save_dir, filename, num_classes):
     """
     マルチラベルタイムラインを可視化して保存
     """

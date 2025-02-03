@@ -12,7 +12,7 @@ from torch.utils.data import ConcatDataset, DataLoader
 import torchvision.transforms as transforms
 
 from config.config import load_config
-from models import  MultiLabelDetectionModel
+from model.setup_models import setup_model
 from evaluate import ModelEvaluator
 from utils.torch_utils import get_device_and_num_gpus, set_seed
 from data.dataloader import create_train_val_dataloaders
@@ -133,26 +133,17 @@ def train_val(config):
     device, num_gpus = get_device_and_num_gpus()
     set_seed(42)
     train_datasets, val_datasets = setup_data(config)
-    
-    train_dataloader, val_dataloaders = create_train_val_dataloaders(config, NOW_FOLD, num_gpus)
+    train_dataloader, val_dataloader = create_train_val_dataloaders(config, NOW_FOLD, num_gpus)
     
     print(len(train_datasets))
     print(len(val_datasets))
     
     # debug
-    plot_dataset_samples(train_dataloader)
+    # plot_dataset_samples(train_dataloader)
     # show_dataset_stats(train_dataloader)
-    os._exit(0)
+    # os._exit(0)
     
-    model = MultiLabelDetectionModel(num_classes=config.training.num_classes,
-                                     pretrained=config.training.pretrained,
-                                     freeze_backbone=config.training.freeze_backbone)
-    
-    if num_gpus > 1:
-        model = nn.DataParallel(model)  # モデルを複数GPUで学習する場合
-    model = model.to(device)
-    
-    print(f'Training {config.training.mode} model')
+    model = setup_model(config, device, num_gpus)
     
     # 学習パラメータ
     optimizer = optim.Adam(model.parameters(), lr=float(config.training.learning_rate))
@@ -162,9 +153,9 @@ def train_val(config):
     loss_history = {'train': [], 'val': []}
     best_validation_loss = float('inf')
     
-    evaluator = ModelEvaluator(config.paths.save_name)
+    evaluator = ModelEvaluator(config.paths.save_dir)
     
-    for epoch in range(config.training.max_epoch_num):
+    for epoch in range(config.training.max_epochs):
         training_loss = 0.0
         validation_loss = 0.0
         
@@ -204,13 +195,13 @@ def train_val(config):
 
         if best_validation_loss > avg_validation_loss:
             best_validation_loss = avg_validation_loss
-            torch.save(model.state_dict(), f"{config.paths.save_name}/model_best.pth")
+            torch.save(model.state_dict(), f"{config.paths.save_dir}/model_best.pth")
             saved_str = " ==> model saved"
         else:
             saved_str = ""
             
         if (epoch + 1) % 10 == 0:
-            torch.save(model.state_dict(), f'{config.paths.save_name}/epoch_{epoch+1}_model.pth')
+            torch.save(model.state_dict(), f'{config.paths.save_dir}/epoch_{epoch+1}_model.pth')
 
         print("epoch %d: training_loss:%.4f validation_loss:%.4f %s" %
               (epoch + 1, avg_training_loss, avg_validation_loss, saved_str))

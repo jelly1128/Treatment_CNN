@@ -1,22 +1,25 @@
+import logging
 import os
 import argparse
-import random
-import numpy as np
 import matplotlib.pyplot as plt
 from collections import Counter
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import ConcatDataset, DataLoader
+from torch.utils.data import ConcatDataset
 import torchvision.transforms as transforms
 
 from config.config import load_config
-from model.setup_models import setup_model
-from evaluate import ModelEvaluator
-from utils.torch_utils import get_device_and_num_gpus, set_seed
 from data.dataloader import create_train_val_dataloaders
-from data.datasets import MultiLabelDetectionDataset
+from engine.trainer import Trainer
+from engine.validator import Validator
+from model.setup_models import setup_model
+from utils.torch_utils import get_device_and_num_gpus, set_seed
+from utils.logger import setup_logging
+from utils.evaluator import ModelEvaluator
+
+
 
 SPLIT1 = (
     "20210119093456_000001-001",
@@ -56,31 +59,6 @@ FOLD4 = (SPLIT4, SPLIT1, SPLIT2)
 
 NOW_FOLD = FOLD1
 
-    
-def setup_data(config):
-    train_data_transforms = transforms.Compose([
-        transforms.RandomRotation(degrees=360),
-        transforms.ToTensor(),
-        ])
-    
-    val_data_transforms = transforms.Compose([
-        transforms.ToTensor(),
-        ])
-    
-    train_datasets_list = []
-    for split in [NOW_FOLD[0], NOW_FOLD[1]]:
-        dataset = MultiLabelDetectionDataset(config.paths.root,
-                                             transform=train_data_transforms,
-                                             num_classes=config.training.num_classes,
-                                             split=split)
-        train_datasets_list.append(dataset)
-    train_datasets = ConcatDataset(train_datasets_list)
-    val_datasets = MultiLabelDetectionDataset(config.paths.root,
-                                             transform=val_data_transforms,
-                                             num_classes=config.training.num_classes,
-                                             split=NOW_FOLD[2])
-    
-    return train_datasets, val_datasets
 
 def plot_dataset_samples(dataloader):
     # サンプルを表示し、1つの画像として保存
@@ -128,84 +106,50 @@ def show_dataset_stats(dataloader):
     for class_label, count in sorted(class_samples.items()):
         print(f"クラス {class_label}: {count}")
 
-def train_val(config):
+def train_val(config, fold):
     # setup
     device, num_gpus = get_device_and_num_gpus()
     set_seed(42)
-    train_datasets, val_datasets = setup_data(config)
-    train_dataloader, val_dataloader = create_train_val_dataloaders(config, NOW_FOLD, num_gpus)
-    
-    print(len(train_datasets))
-    print(len(val_datasets))
-    
+    train_dataloader, val_dataloader = create_train_val_dataloaders(config, fold, num_gpus)
+
     # debug
     # plot_dataset_samples(train_dataloader)
-    # show_dataset_stats(train_dataloader)
+    show_dataset_stats(train_dataloader)
     # os._exit(0)
-    
+
     model = setup_model(config, device, num_gpus)
-    
+
     # 学習パラメータ
     optimizer = optim.Adam(model.parameters(), lr=float(config.training.learning_rate))
     criterion = nn.BCEWithLogitsLoss()
-    
+
     # 学習の経過を保存
     loss_history = {'train': [], 'val': []}
-    best_validation_loss = float('inf')
-    
     evaluator = ModelEvaluator(config.paths.save_dir)
-    
+
+    # 学習・検証エンジン
+    trainer = Trainer(model, optimizer, criterion, device)
+    validator = Validator(model, criterion, device)
+
+    # 学習ループ
     for epoch in range(config.training.max_epochs):
-        training_loss = 0.0
-        validation_loss = 0.0
-        
-        # training
-        model.train()
-        
-        for batch_idx, (images, _, labels) in enumerate(train_dataloader):  # batch_idxとimageを取得
-            images = images.to(device)
-            labels = labels.to(device)
-            optimizer.zero_grad()
-            outputs = model(images) # BCEWithLogitsLoss を使用している場合，モデルの出力はlogits 確率じゃない！
-            # print(outputs.size())
+        train_loss = trainer.train(train_dataloader)
+        val_loss = validator.validate(val_dataloader)
 
-            loss = criterion(outputs, labels)
-            training_loss += loss.item()
+        loss_history['train'].append(train_loss)
+        loss_history['val'].append(val_loss)
 
-            loss.backward()
-            optimizer.step()
+        # ログ出力
+        log_message = "epoch %d: training_loss: %.4f validation_loss: %.4f" % (
+            epoch + 1, train_loss, val_loss)
         
-        avg_training_loss = training_loss / len(train_dataloader)
-        loss_history['train'].append(avg_training_loss)
-        
-        # validation
-        model.eval()
+        logging.info(log_message)
 
-        with torch.no_grad():
-            for batch_idx, (images, _, labels) in enumerate(val_dataloader):
-                images = images.to(device)
-                labels = labels.to(device)
-                outputs = model(images)
-                loss = criterion(outputs, labels)  # ラベルと比較
-                
-                validation_loss += loss.item()
-        
-        avg_validation_loss = validation_loss / len(val_dataloader)
-        loss_history['val'].append(avg_validation_loss)
+        # モデル保存
+        if val_loss <= min(loss_history['val']):
+            torch.save(model.state_dict(), os.path.join(config.paths.save_dir, "best_model.pth"))
 
-        if best_validation_loss > avg_validation_loss:
-            best_validation_loss = avg_validation_loss
-            torch.save(model.state_dict(), f"{config.paths.save_dir}/model_best.pth")
-            saved_str = " ==> model saved"
-        else:
-            saved_str = ""
-            
-        if (epoch + 1) % 10 == 0:
-            torch.save(model.state_dict(), f'{config.paths.save_dir}/epoch_{epoch+1}_model.pth')
-
-        print("epoch %d: training_loss:%.4f validation_loss:%.4f %s" %
-              (epoch + 1, avg_training_loss, avg_validation_loss, saved_str))
-            
+    # 学習曲線の可視化
     evaluator.plot_learning_curve(loss_history)
     evaluator.save_loss_to_csv(loss_history)
     
@@ -214,27 +158,27 @@ def parse_args():
     parser.add_argument('-c', '--config', help='Path to config file', default='config.yaml')
     parser.add_argument('-lr', '--learning_rate', help='Learning rate', type=float)
     parser.add_argument('-b', '--batch_size', help='Batch size', type=int)
-    parser.add_argument('-m', '--max_epoch_num', help='Maximum number of training epochs', type=int)
+    parser.add_argument('-m', '--max_epochs', help='Maximum number of training epochs', type=int)
     return parser.parse_args()
     
 def main():
     args = parse_args()
     config = load_config(args.config)
+    setup_logging(config.paths.save_dir)
 
     # Command line arguments override config file
     if args.learning_rate is not None:
         config.training.learning_rate = args.learning_rate
     if args.batch_size is not None:
         config.training.batch_size = args.batch_size
-    if args.max_epoch_num is not None:
-        config.training.max_epoch_num = args.max_epoch_num
+    if args.max_epochs is not None:
+        config.training.max_epochs = args.max_epochs
         
-    # 結果保存folderを作成
-    if not os.path.exists(os.path.join(config.paths.save_dir)):
-        os.makedirs(config.paths.save_dir, exist_ok=True)
+    # 結果保存フォルダを作成
+    os.makedirs(config.paths.save_dir, exist_ok=True)
     
     # Use the config in your code
-    train_val(config)
+    train_val(config, NOW_FOLD)
 
 if __name__ == '__main__':
     main()

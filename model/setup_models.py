@@ -18,7 +18,7 @@ def setup_model(config, device, num_gpus, mode='train'):
     """
     # モデルの初期化
     model = MultiLabelDetectionModel(
-        num_classes=config.training.num_classes,
+        num_classes=config.training.num_classes if mode == 'train' else config.test.num_classes,  # テスト時はnum_classes=config.testing.num_classes
         pretrained=config.training.pretrained if mode == 'train' else False,  # テスト時はpretrained=False
         freeze_backbone=config.training.freeze_backbone if mode == 'train' else False  # テスト時はfreeze_backbone=False
     )

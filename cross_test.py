@@ -23,6 +23,7 @@ from torch.utils.data import ConcatDataset, DataLoader
 import torch.nn.functional as F
 import torchvision.transforms as transforms
 
+import logging
 
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
@@ -33,8 +34,7 @@ from evaluate import ModelEvaluator
 from config.config import load_test_config
 from data.dataloader import create_multilabel_test_dataloaders
 from data.visualization import plot_dataset_samples, show_dataset_stats
-from engine.trainer import Trainer
-from engine.validator import Validator
+from engine.tester import Tester
 from model.setup_models import setup_model
 from utils.torch_utils import get_device_and_num_gpus, set_seed
 from utils.logger import setup_logging
@@ -137,40 +137,20 @@ def test(config):
     device, num_gpus = get_device_and_num_gpus()
     set_seed(42)
     
-    # テストデータローダーの作成
-    test_dataloader = create_multilabel_test_dataloaders(config, TEST_SPLIT, num_gpus)
+    tester = Tester(config, device, num_gpus, TEST_SPLIT)
     
-    # モデルの作成
-    model = setup_model(config, device, num_gpus, mode='test')
-    
-    # model = MultiLabelDetectionModel(num_classes=config.test.num_classes)
-    # if num_gpus > 1:
-    #     model = nn.DataParallel(model)
-    # model = model.to(device)
-
-    # # モデルの読み込み
-    # state_dict = torch.load(config.paths.model)
-    # if 'module.' in list(state_dict.keys())[0]:
-    #     # state_dictがDataParallelで保存されている場合
-    #     if num_gpus > 1:
-    #         model.load_state_dict(state_dict)
-    #     else:
-    #         # DataParallelなしでモデルを読み込む場合、'module.'プレフィックスを削除
-    #         model.load_state_dict({k.replace('module.', ''): v for k, v in state_dict.items()})
-    # else:
-    #     # state_dictがDataParallelなしで保存されている場合
-    #     if num_gpus > 1:
-    #         # DataParallelを使用する場合、'module.'プレフィックスを追加
-    #         model.module.load_state_dict(state_dict)
-    #     else:
-    #         model.load_state_dict(state_dict)
-    
-            
-    # 学習の経過を保存
-    model.eval()
+    tester.test()
     
     os._exit(0)
     
+    # テストデータローダーの作成
+    test_dataloaders = create_multilabel_test_dataloaders(config, TEST_SPLIT, num_gpus)
+    
+    # モデルの作成
+    model = setup_model(config, device, num_gpus, mode='test')
+    # 学習の経過を保存
+    model.eval()
+        
     # すべての結果を保存
     all_probabilities = []
     all_predictions = []
@@ -182,9 +162,24 @@ def test(config):
     # GradCAMの計算
     # cam = GradCAM(model=model, target_layers=target_layers)
     
-    data_transform = transforms.Compose([
-        transforms.ToTensor(),
-    ])
+    evaluator = ModelEvaluator(config.paths.save_dir)
+    
+    for folder_name, test_dataloader in test_dataloaders.items():
+        logging.info(f"Testing on {folder_name}...")
+        # 結果保存用フォルダを作成
+        save_path = os.path.join(config.paths.save_dir, folder_name)
+        os.makedirs(save_path, exist_ok=True)
+        
+        metrics = evaluator.evaluate(model, test_dataloader, device)
+
+        # 結果の保存と可視化
+        folder_save_path = os.path.join(config.paths.save_dir, folder_name)
+        evaluator.save_metrics(metrics, folder_save_path)
+        evaluator.plot_metrics(metrics, folder_save_path)
+
+    logging.info("テスト完了。結果を保存しました。")
+        
+    os._exit(0)
     
     for folder_name in TEST_SPLIT:
         # 各テストフォルダ毎の結果の保存folderを作成
@@ -350,7 +345,7 @@ def main():
     
     setup_logging(config.paths.save_dir)
     
-    os._exit(0)
+    # os._exit(0)
     
     test(config)
 

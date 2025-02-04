@@ -27,6 +27,8 @@ import torchvision.transforms as transforms
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 
+from data_transformer import DataTransformer
+from datasets import AnomalyDetectionDatasetForTest, TreatmentClassificationDatasetForTest, MultiLabelDetectionDatasetForTest
 from models import AnomalyDetectionModel, TreatmentClassificationModel, MultiLabelDetectionModel
 from evaluate import ModelEvaluator
 
@@ -337,11 +339,10 @@ def parse_args():
 def main():
     args = parse_args()
     config = load_test_config(args.config)
+    setup_logging(config.paths.save_dir)
     
     # 結果保存フォルダを作成
     os.makedirs(config.paths.save_dir, exist_ok=True)
-    
-    setup_logging(config.paths.save_dir)
     
     os._exit(0)
     

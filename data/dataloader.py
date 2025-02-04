@@ -1,8 +1,8 @@
 from torch.utils.data import DataLoader, ConcatDataset
-from .datasets import MultiLabelDetectionDataset
+from .datasets import MultiLabelDetectionDataset, MultiLabelDetectionDatasetForTest
 from .transforms import get_train_transforms, get_test_transforms
 
-def create_train_val_dataloaders(config, fold, num_gpus):
+def create_multilabel_train_dataloaders(config, fold, num_gpus):
     """
     指定されたフォールドのデータローダーを作成します
     
@@ -28,3 +28,22 @@ def create_train_val_dataloaders(config, fold, num_gpus):
     val_loader = DataLoader(val_split, batch_size=config.training.batch_size * num_gpus, shuffle=False, num_workers=4 * num_gpus)
     
     return train_loader, val_loader
+
+
+def create_multilabel_test_dataloaders(config, fold, num_gpus):
+    """
+    指定されたフォールドのデータローダーを作成します
+    
+    パラメータ:
+        config (dataclass): 設定
+    
+    戻り値:
+        tuple: train_loader, val_loader
+    """
+    test_split = MultiLabelDetectionDatasetForTest(config.paths.root,
+                                                  transform=get_test_transforms(),
+                                                  split=fold)
+    
+    test_loader = DataLoader(test_split, batch_size=config.training.batch_size * num_gpus, shuffle=False, num_workers=4 * num_gpus)
+    
+    return test_loader

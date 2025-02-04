@@ -1,0 +1,9 @@
+test:
+  mode: anomaly_detection
+  img_size: 224
+  num_classes: 6
+
+paths:
+  root: '/home/tanaka/demo_data'
+  save_dir: 'cross_valid_6class_fold1_results'
+  model: '/home/tanaka/0207/multilabel_cross_valid_6class_fold1/best_model.pth'

@@ -114,10 +114,6 @@ def parse_args():
 def main():
     args = parse_args()
     config = load_train_config(args.config)
-    
-    # 結果保存フォルダを作成
-    os.makedirs(config.paths.save_dir, exist_ok=True)
-    
     setup_logging(config.paths.save_dir)
 
     # Command line arguments override config file
@@ -128,6 +124,9 @@ def main():
     if args.max_epochs is not None:
         config.training.max_epochs = args.max_epochs
         
+    # 結果保存フォルダを作成
+    os.makedirs(config.paths.save_dir, exist_ok=True)
+    
     # Use the config in your code
     train_val(config, NOW_FOLD)
 

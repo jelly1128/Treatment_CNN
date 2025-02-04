@@ -132,37 +132,44 @@ def evaluate_classification(y_true, y_prob, threshold):
     return accuracy, precision, recall, f1
 
 
-def test_anomaly_detection_model(config):
+def test(config):
     # setup
     device, num_gpus = get_device_and_num_gpus()
     set_seed(42)
-    train_dataloader, val_dataloader = create_train_val_dataloaders(config, fold, num_gpus)
     
-    model = MultiLabelDetectionModel(num_classes=config.test.num_classes)
-    if num_gpus > 1:
-        model = nn.DataParallel(model)
-    model = model.to(device)
+    # テストデータローダーの作成
+    test_dataloader = create_multilabel_test_dataloaders(config, TEST_SPLIT, num_gpus)
+    
+    # モデルの作成
+    model = setup_model(config, device, num_gpus, mode='test')
+    
+    # model = MultiLabelDetectionModel(num_classes=config.test.num_classes)
+    # if num_gpus > 1:
+    #     model = nn.DataParallel(model)
+    # model = model.to(device)
 
-    # モデルの読み込み
-    state_dict = torch.load(config.paths.model)
-    if 'module.' in list(state_dict.keys())[0]:
-        # state_dictがDataParallelで保存されている場合
-        if num_gpus > 1:
-            model.load_state_dict(state_dict)
-        else:
-            # DataParallelなしでモデルを読み込む場合、'module.'プレフィックスを削除
-            model.load_state_dict({k.replace('module.', ''): v for k, v in state_dict.items()})
-    else:
-        # state_dictがDataParallelなしで保存されている場合
-        if num_gpus > 1:
-            # DataParallelを使用する場合、'module.'プレフィックスを追加
-            model.module.load_state_dict(state_dict)
-        else:
-            model.load_state_dict(state_dict)
+    # # モデルの読み込み
+    # state_dict = torch.load(config.paths.model)
+    # if 'module.' in list(state_dict.keys())[0]:
+    #     # state_dictがDataParallelで保存されている場合
+    #     if num_gpus > 1:
+    #         model.load_state_dict(state_dict)
+    #     else:
+    #         # DataParallelなしでモデルを読み込む場合、'module.'プレフィックスを削除
+    #         model.load_state_dict({k.replace('module.', ''): v for k, v in state_dict.items()})
+    # else:
+    #     # state_dictがDataParallelなしで保存されている場合
+    #     if num_gpus > 1:
+    #         # DataParallelを使用する場合、'module.'プレフィックスを追加
+    #         model.module.load_state_dict(state_dict)
+    #     else:
+    #         model.load_state_dict(state_dict)
     
             
     # 学習の経過を保存
     model.eval()
+    
+    os._exit(0)
     
     # すべての結果を保存
     all_probabilities = []
@@ -345,11 +352,7 @@ def main():
     
     os._exit(0)
     
-    tester = Tester(config, device)
-
-    for folder_name in TEST_SPLIT:
-        test_dataloader = create_test_dataloader(config, folder_name, num_gpus)
-        tester.test(test_dataloader, folder_name)
+    test(config)
 
 if __name__ == '__main__':
     main()

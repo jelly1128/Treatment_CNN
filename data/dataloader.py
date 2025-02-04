@@ -30,20 +30,29 @@ def create_multilabel_train_dataloaders(config, fold, num_gpus):
     return train_loader, val_loader
 
 
-def create_multilabel_test_dataloaders(config, fold, num_gpus):
-    """
-    指定されたフォールドのデータローダーを作成します
+def create_multilabel_test_dataloaders(config, split, num_gpus):
+    test_dataloaders = {}
+    for folder_name in split:
+        # # 結果保存用フォルダを作成
+        # save_path = os.path.join(config.paths.save_dir, folder_name)
+        # os.makedirs(save_path, exist_ok=True)
+
+        # データセット作成
+        test_dataset = MultiLabelDetectionDatasetForTest(
+            config.paths.root,
+            folder_name,
+            get_test_transforms(),
+            config.test.num_classes
+        )
+
+        # データローダー作成
+        test_dataloader = DataLoader(
+            test_dataset,
+            batch_size=1,
+            shuffle=False,
+            num_workers=4 * num_gpus
+        )
+
+        test_dataloaders[folder_name] = test_dataloader
     
-    パラメータ:
-        config (dataclass): 設定
-    
-    戻り値:
-        tuple: train_loader, val_loader
-    """
-    test_split = MultiLabelDetectionDatasetForTest(config.paths.root,
-                                                  transform=get_test_transforms(),
-                                                  split=fold)
-    
-    test_loader = DataLoader(test_split, batch_size=config.training.batch_size * num_gpus, shuffle=False, num_workers=4 * num_gpus)
-    
-    return test_loader
+    return test_dataloaders

@@ -63,11 +63,10 @@ def train_val(config, fold):
     train_dataloader, val_dataloader = create_multilabel_train_dataloaders(config, fold, num_gpus)
 
     # debug
-    plot_dataset_samples(config.paths.save_dir, train_dataloader)
-    show_dataset_stats(train_dataloader)
-    os._exit(0)
+    # plot_dataset_samples(config.paths.save_dir, train_dataloader)
+    # show_dataset_stats(train_dataloader)
 
-    model = setup_model(config, device, num_gpus)
+    model = setup_model(config, device, num_gpus, mode='train')
 
     # 学習パラメータ
     optimizer = optim.Adam(model.parameters(), lr=float(config.training.learning_rate))
@@ -80,6 +79,8 @@ def train_val(config, fold):
     # 学習・検証エンジン
     trainer = Trainer(model, optimizer, criterion, device)
     validator = Validator(model, criterion, device)
+    
+    # os._exit(0)
 
     # 学習ループ
     for epoch in range(config.training.max_epochs):

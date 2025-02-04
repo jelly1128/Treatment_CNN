@@ -1,6 +1,6 @@
 import torch
 from pathlib import Path
-from config.config_loader import load_config
+from config.config_loader import load_train_config
 from data.dataloader import create_dataloaders
 from model.model import MultiLabelDetectionModel
 from model.loss import get_criterion
@@ -9,9 +9,10 @@ from engine.validator import Validator
 from utils.logger import setup_logging
 from utils.visualization import plot_learning_curve
 
+
 def main():
     # 設定読み込み
-    config = load_config(Path("config.yaml"))
+    config = load_train_config(Path("config.yaml"))
     setup_logging(Path(config.paths.save_dir))
     
     # デバイス設定

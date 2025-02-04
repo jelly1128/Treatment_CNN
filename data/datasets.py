@@ -519,29 +519,6 @@ class MultiLabelDetectionDatasetForTest(Dataset):
                 labels.sort()  # 昇順にソート
                 # print(row, labels)
                 self.img_dict[os.path.join(row[0])] = labels
-                
-                """
-                前コード
-                """
-                # # 処置4クラス+体外2クラス(+無効フレーム9クラス)
-                # labels = [int(label) for label in row[1:] if label.strip().isdigit()]
-                # labels.sort()  # ここで昇順にソート
-                # # print(row, labels)
-                # self.img_dict[os.path.join(row[0])] = labels
-                
-                # 処置4クラス+体外2クラス(+無効フレーム1クラス)(5,6入れ替え後)
-                # labels = [int(label) for label in row[1:] if label.strip().isdigit()]
-                # # # 無効フレームのラベルをすべて6に置き換える
-                # labels = [6 if 6 <= label <= 14 else label for label in labels]
-                # labels.sort()  # ここで昇順にソート
-                # self.img_dict[os.path.join(row[0])] = labels
-                
-                # 処置4クラス+体外2クラス(5,6入れ替え後)
-                # labels = [int(label) for label in row[1:] if label.strip().isdigit()]
-                # filtered_labels = [label for label in labels if 0 <= label <= 5]
-                # filtered_labels.sort()  # 昇順にソート
-                # # print(row, filtered_labels)
-                # self.img_dict[os.path.join(row[0])] = filtered_labels
     
     def __len__(self):
         """データセットの長さを返す"""

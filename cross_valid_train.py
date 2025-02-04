@@ -1,24 +1,20 @@
 import logging
 import os
 import argparse
-import matplotlib.pyplot as plt
-from collections import Counter
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import ConcatDataset
-import torchvision.transforms as transforms
 
-from config.config import load_config
+from config.config import load_train_config
 from data.dataloader import create_train_val_dataloaders
+from data.visualization import plot_dataset_samples, show_dataset_stats
 from engine.trainer import Trainer
 from engine.validator import Validator
 from model.setup_models import setup_model
 from utils.torch_utils import get_device_and_num_gpus, set_seed
 from utils.logger import setup_logging
 from utils.evaluator import ModelEvaluator
-
 
 
 SPLIT1 = (
@@ -60,52 +56,6 @@ FOLD4 = (SPLIT4, SPLIT1, SPLIT2)
 NOW_FOLD = FOLD1
 
 
-def plot_dataset_samples(dataloader):
-    # サンプルを表示し、1つの画像として保存
-    num_samples_to_show = 10
-    fig, axes = plt.subplots(1, num_samples_to_show, figsize=(20, 4))
-
-    for i, (images, img_names, labels) in enumerate(dataloader):
-        if i >= 1:  # 1バッチだけ処理
-            break
-        for j in range(num_samples_to_show):
-            ax = axes[j]
-            img = images[j].permute(1, 2, 0).numpy()  # CHW to HWC, tensor to numpy
-            ax.imshow(img)
-            ax.set_title(f"Label: {labels[j]}")
-            ax.axis('off')
-            print(f"Image path: {img_names[j]}, Label: {labels[j]}")
-
-    plt.tight_layout()
-    plt.savefig('dataset_samples.png')
-    
-def show_dataset_stats(dataloader):
-    # データセットの総数
-    total_samples = len(dataloader.dataset)
-    
-    # ラベルの分布を計算
-    all_labels = []
-    for batch, (images, _, labels) in enumerate(dataloader):
-        all_labels.extend(labels.cpu().tolist())
-    
-    # クラスごとのサンプル数をカウントするためのカウンターを初期化
-    class_samples = Counter()
-
-    # One-hotラベルを処理
-    for one_hot in all_labels:
-        # one_hotがリストであることを確認
-        if isinstance(one_hot, list):
-            one_hot = torch.tensor(one_hot)  # リストをテンソルに変換
-        # 1の位置を見つけてカウントを更新
-        for idx, value in enumerate(one_hot):
-            if value == 1:
-                class_samples[idx] += 1
-
-    print(f"総サンプル数: {total_samples}")
-    print("クラスごとのサンプル数:")
-    for class_label, count in sorted(class_samples.items()):
-        print(f"クラス {class_label}: {count}")
-
 def train_val(config, fold):
     # setup
     device, num_gpus = get_device_and_num_gpus()
@@ -113,9 +63,9 @@ def train_val(config, fold):
     train_dataloader, val_dataloader = create_train_val_dataloaders(config, fold, num_gpus)
 
     # debug
-    # plot_dataset_samples(train_dataloader)
+    plot_dataset_samples(config.paths.save_dir, train_dataloader)
     show_dataset_stats(train_dataloader)
-    # os._exit(0)
+    os._exit(0)
 
     model = setup_model(config, device, num_gpus)
 
@@ -133,7 +83,7 @@ def train_val(config, fold):
 
     # 学習ループ
     for epoch in range(config.training.max_epochs):
-        train_loss = trainer.train(train_dataloader)
+        train_loss = trainer.train_epoch(train_dataloader)
         val_loss = validator.validate(val_dataloader)
 
         loss_history['train'].append(train_loss)
@@ -163,7 +113,7 @@ def parse_args():
     
 def main():
     args = parse_args()
-    config = load_config(args.config)
+    config = load_train_config(args.config)
     setup_logging(config.paths.save_dir)
 
     # Command line arguments override config file

@@ -2,7 +2,7 @@ import yaml
 from pathlib import Path
 from .schema import Config, TrainingConfig, PathConfig
 
-def load_config(config_path: Path) -> Config:
+def load_train_config(config_path: Path) -> Config:
     with open(config_path, "r") as f:
         config_dict = yaml.safe_load(f)
         

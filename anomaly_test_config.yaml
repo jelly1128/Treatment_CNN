@@ -6,4 +6,4 @@ test:
 paths:
   root: '/home/tanaka/demo_data'
   model: 'trained_models/multilabel_cross_valid_6class_fold4/model_best.pth'
-  save_name: 'cross_valid_6class_fold4_results'
+  save_dir: 'cross_valid_6class_fold4_results'

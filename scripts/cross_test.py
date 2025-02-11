@@ -30,7 +30,7 @@ from pytorch_grad_cam.utils.image import show_cam_on_image
 from data_transformer import DataTransformer
 from datasets import AnomalyDetectionDatasetForTest, TreatmentClassificationDatasetForTest, MultiLabelDetectionDatasetForTest
 from models import AnomalyDetectionModel, TreatmentClassificationModel, MultiLabelDetectionModel
-from evaluate import ModelEvaluator
+from evaluate_afafa import ModelEvaluator
 
 from config.config import load_test_config
 from data.dataloader import create_multilabel_test_dataloaders

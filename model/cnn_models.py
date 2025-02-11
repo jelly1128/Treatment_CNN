@@ -163,3 +163,69 @@ class MultiLabelDetectionModel(nn.Module):
         out = self.output_layer(features)  # (batch_size, num_classes)
 
         return out
+
+class MultiTaskDetectionModelConcat(nn.Module):
+    def __init__(self, num_classes=9, pretrained=False, freeze_backbone=False):
+        """
+        Args:
+            num_main_classes: 主クラスの数（例: 6）
+            num_unclear_classes: 不鮮明クラスの数（例: 9）
+        """
+        super(MultiTaskDetectionModelConcat, self).__init__()
+        
+        # ResNet18の初期化（pretrainedの場合はImageNetの重みを利用）
+        self.resnet = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None)
+        feature_dim = self.resnet.fc.in_features
+        
+        # 最終層をIdentityに置き換えることで、特徴抽出部分のみを使用
+        self.resnet.fc = nn.Identity()
+        
+        if freeze_backbone:
+            for param in self.resnet.parameters():
+                param.requires_grad = False
+        
+        # 主クラス用の全結合層
+        self.main_head = nn.Linear(feature_dim, 6)
+        # 不鮮明クラス用の全結合層
+        if num_classes == 7:
+            self.unclear_head = nn.Linear(feature_dim, 1)
+        elif num_classes == 15:
+            self.unclear_head = nn.Linear(feature_dim, 9)
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            x: 入力テンソル (batch_size, c, h, w)
+        Returns:
+            連結された出力テンソル (batch_size, num_main_classes + num_unclear_classes)
+        """
+        # バックボーンによる特徴抽出
+        features = self.resnet(x)  # shape: (batch_size, feature_dim)
+        
+        # それぞれのヘッドでの出力
+        main_out = self.main_head(features)       
+        unclear_out = self.unclear_head(features)   
+        
+        # 2つの出力を連結 (例: dim=1 で連結して最終的な出力次元が (batch_size, 15) になる)
+        output = torch.cat((main_out, unclear_out), dim=1)
+        return output
+
+# ======================================
+# モデルのインスタンス生成と出力例
+# ======================================
+
+def main():
+    # 例: 主クラス6、かつ不鮮明クラス9 → 合計15クラスとして出力
+    model = MultiTaskDetectionModelConcat(num_classes=15, pretrained=True, freeze_backbone=False)
+
+    # ダミー入力例 (batch_size=4, RGB画像 224x224)
+    dummy_input = torch.randn(4, 3, 224, 224)
+
+    # 順伝播
+    output = model(dummy_input)  # 出力 shape: (4, 15)
+    print("Concatenated output shape:", output.shape)
+
+if __name__ == '__main__':
+    main()
+
+

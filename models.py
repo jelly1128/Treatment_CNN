@@ -147,7 +147,11 @@ class MultiLabelDetectionModel(nn.Module):
                 param.requires_grad = False
         
         # Define the output layer
-        self.output_layer = nn.Linear(feature_dim, num_classes)
+        self.output_layer = nn.Linear(feature_dim, 6) # 主クラス用の出力層
+        if num_classes == 7:
+            self.sub_output_layer = nn.Linear(feature_dim, 1) # 副クラス用の出力層
+        elif num_classes == 15:
+            self.sub_output_layer = nn.Linear(feature_dim, 9) # 副クラス用の出力層
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -161,5 +165,13 @@ class MultiLabelDetectionModel(nn.Module):
         """
         features = self.resnet(x)  # (batch_size, num_features)
         out = self.output_layer(features)  # (batch_size, num_classes)
+
+        if self.num_classes == 7:
+            sub_out = self.sub_output_layer(features)  # (batch_size, 1)
+            out = torch.cat((out, sub_out), dim=1)
+            
+        elif self.num_classes == 15:
+            sub_out = self.sub_output_layer(features)  # (batch_size, 9)
+            out = torch.cat((out, sub_out), dim=1)
 
         return out

@@ -439,7 +439,7 @@ class MultiLabelDetectionDataset(Dataset):
         self.num_classes = num_classes
         self.split = split
 
-        self.img_dict = {}  # A dictionary to store image file names and labels.
+        self.image_dict = {}  # A dictionary to store image file names and labels.
 
         # Read the CSV files in each subfolder and store the image file names and labels.
         for subfolder in self.split:
@@ -456,7 +456,8 @@ class MultiLabelDetectionDataset(Dataset):
                         labels = [6 if 6 <= label <= 14 else label for label in labels]
 
                     labels.sort()  # Sort the labels in ascending order.
-                    self.img_dict[os.path.join(subfolder, row[0])] = labels
+                    # print(f'labels: {labels}')
+                    self.image_dict[os.path.join(subfolder, row[0])] = labels
     
     def __len__(self) -> int:
         """データセットの長さを返す"""
@@ -489,7 +490,7 @@ class MultiLabelDetectionDataset(Dataset):
     
     
 class MultiLabelDetectionDatasetForTest(Dataset):
-    def __init__(self, root_path: str, test_dir: str, transform, num_classes: int):
+    def __init__(self, root_path: str, test_dir: str, transform: callable, num_classes: int) -> None:
         
         """
         基本的なテスト用データセットクラスの初期化

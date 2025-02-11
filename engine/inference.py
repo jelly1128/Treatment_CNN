@@ -57,7 +57,7 @@ class Inference:
                     # print(image_paths[0], labels[0].cpu().numpy(), formatted_outputs)
                     
                     folder_probabilities.append(formatted_outputs)
-                    folder_labels.append(labels[0].cpu().numpy())
+                    folder_labels.append(labels[0].cpu().numpy().astype(int))
                     folder_image_paths.extend(image_paths)
                     
             # フォルダごとの結果を辞書に保存

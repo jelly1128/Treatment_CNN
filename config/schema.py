@@ -1,9 +1,9 @@
 from pydantic import BaseModel
 
 class TrainingConfig(BaseModel):
-    mode: str
     img_size: int
     num_classes: int
+    model_architecture: str
     pretrained: bool
     freeze_backbone: bool
     learning_rate: float
@@ -11,7 +11,6 @@ class TrainingConfig(BaseModel):
     max_epochs: int
 
 class TestConfig(BaseModel):
-    mode: str
     img_size: int
     num_classes: int
 

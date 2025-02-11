@@ -15,7 +15,7 @@ class TestConfig(BaseModel):
     num_classes: int
 
 class PathConfig(BaseModel):
-    root: str
+    dataset_root: str
     save_dir: str
     model: str | None = None
     

@@ -527,16 +527,16 @@ def visualize_timeline(labels, save_dir, filename, n_class):
     print(f'Timeline image saved at {os.path.join(save_dir, f"{filename}.png")}')
     
     
-# def process_all_results(root_dir, num_classes, window_size=5, step=1, methods=None):
-#     analyzer = Analyzer(root_dir, num_classes)
+# def process_all_results(dataset_root, num_classes, window_size=5, step=1, methods=None):
+#     analyzer = Analyzer(dataset_root, num_classes)
 #     fold_metrics_raw = {}
 #     fold_metrics_smoothed = {}
 #     all_predictions_raw = []
 #     all_predictions_smoothed = []
 #     all_true_labels = []
     
-#     for fold in sorted(os.listdir(root_dir)):
-#         fold_path = os.path.join(root_dir, fold)
+#     for fold in sorted(os.listdir(dataset_root)):
+#         fold_path = os.path.join(dataset_root, fold)
 #         if not os.path.isdir(fold_path):
 #             continue
             
@@ -600,8 +600,8 @@ def visualize_timeline(labels, save_dir, filename, n_class):
 #     overall_cm_raw, overall_metrics_raw = calculate_metrics(all_true_labels, all_predictions_raw)
 #     overall_cm_smoothed, overall_metrics_smoothed = calculate_metrics(all_true_labels, all_predictions_smoothed)
     
-#     save_confusion_matrix(overall_cm_raw, os.path.join(root_dir, 'overall_confusion_matrix_raw.csv'))
-#     save_confusion_matrix(overall_cm_smoothed, os.path.join(root_dir, 'overall_confusion_matrix_smoothed.csv'))
+#     save_confusion_matrix(overall_cm_raw, os.path.join(dataset_root, 'overall_confusion_matrix_raw.csv'))
+#     save_confusion_matrix(overall_cm_smoothed, os.path.join(dataset_root, 'overall_confusion_matrix_smoothed.csv'))
     
 #     return {
 #         'raw': fold_metrics_raw,
@@ -611,8 +611,8 @@ def visualize_timeline(labels, save_dir, filename, n_class):
 #     }
 
 
-def process_all_results(root_dir, num_classes, window_sizes=[3,5,7,9,11,13,15], step=1):
-    analyzer = Analyzer(root_dir, num_classes)
+def process_all_results(dataset_root, num_classes, window_sizes=[3,5,7,9,11,13,15], step=1):
+    analyzer = Analyzer(dataset_root, num_classes)
     results_by_window = {}
     
     for window_size in window_sizes:
@@ -623,8 +623,8 @@ def process_all_results(root_dir, num_classes, window_sizes=[3,5,7,9,11,13,15], 
         all_predictions_smoothed = []
         all_true_labels = []
         
-        for fold in sorted(os.listdir(root_dir)):
-            fold_path = os.path.join(root_dir, fold)
+        for fold in sorted(os.listdir(dataset_root)):
+            fold_path = os.path.join(dataset_root, fold)
             if not os.path.isdir(fold_path):
                 continue
                 
@@ -707,7 +707,7 @@ def process_all_results(root_dir, num_classes, window_sizes=[3,5,7,9,11,13,15], 
         overall_cm_raw, overall_metrics_raw = calculate_metrics(all_true_labels, all_predictions_raw)
         overall_cm_smoothed, overall_metrics_smoothed = calculate_metrics(all_true_labels, all_predictions_smoothed)
         
-        window_dir = os.path.join(root_dir, f'window_{window_size}')
+        window_dir = os.path.join(dataset_root, f'window_{window_size}')
         os.makedirs(window_dir, exist_ok=True)
         
         save_confusion_matrix(overall_cm_raw, os.path.join(window_dir, 'overall_confusion_matrix_raw.csv'))
@@ -721,7 +721,7 @@ def process_all_results(root_dir, num_classes, window_sizes=[3,5,7,9,11,13,15], 
         }
     
     # Create comprehensive summary across all window sizes
-    create_window_size_comparison(results_by_window, root_dir)
+    create_window_size_comparison(results_by_window, dataset_root)
     
     
     return results_by_window
@@ -812,7 +812,7 @@ def main():
     # window_sizes = [1,3,5,7, 9,11,13,15,17,19, 21,23, 25,27,29,31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59, 61]
     window_sizes = [1]
     results = process_all_results(
-        root_dir=save_dir,
+        dataset_root=save_dir,
         num_classes=num_classes,
         window_sizes=window_sizes
     )
@@ -824,7 +824,7 @@ def main():
 #     os.makedirs(save_dir, exist_ok=True)
     
 #     metrics = process_all_results(
-#         root_dir=save_dir,
+#         dataset_root=save_dir,
 #         num_classes=num_classes,
 #         window_size=15,
 #         step=1

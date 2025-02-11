@@ -446,14 +446,14 @@ def visualize_timeline(labels, save_dir, filename, n_class):
     print(f'Timeline image saved at {os.path.join(save_dir, f"{filename}.png")}')
     
     
-def process_all_results(root_dir, num_classes, window_size=5, step=1, methods=None):
-    analyzer = Analyzer(root_dir, num_classes)
+def process_all_results(dataset_root, num_classes, window_size=5, step=1, methods=None):
+    analyzer = Analyzer(dataset_root, num_classes)
     fold_metrics = {}
     all_predictions = []
     all_true_labels = []
     
-    for fold in sorted(os.listdir(root_dir)):
-        fold_path = os.path.join(root_dir, fold)
+    for fold in sorted(os.listdir(dataset_root)):
+        fold_path = os.path.join(dataset_root, fold)
         if not os.path.isdir(fold_path):
             continue
             
@@ -539,29 +539,29 @@ def process_all_results(root_dir, num_classes, window_size=5, step=1, methods=No
     # Save overall confusion matrices
     save_confusion_matrix(
         overall_cm,
-        os.path.join(root_dir, 'overall_confusion_matrix_raw.csv'),
+        os.path.join(dataset_root, 'overall_confusion_matrix_raw.csv'),
         normalized=False
     )
     save_confusion_matrix(
         overall_cm,
-        os.path.join(root_dir, 'overall_confusion_matrix_normalized.csv'),
+        os.path.join(dataset_root, 'overall_confusion_matrix_normalized.csv'),
         normalized=True
     )
     
     # Save overall metrics summary
     pd.DataFrame(overall_metrics).to_csv(
-        os.path.join(root_dir, 'overall_metrics.csv'),
+        os.path.join(dataset_root, 'overall_metrics.csv'),
         index=False
     )
     
     return fold_metrics, overall_metrics
 
-# def process_all_results(root_dir, num_classes, window_size=5, step=1, methods=None):
-#     analyzer = Analyzer(root_dir, num_classes)
+# def process_all_results(dataset_root, num_classes, window_size=5, step=1, methods=None):
+#     analyzer = Analyzer(dataset_root, num_classes)
 #     fold_metrics = {}
     
-#     for fold in sorted(os.listdir(root_dir)):
-#         fold_path = os.path.join(root_dir, fold)
+#     for fold in sorted(os.listdir(dataset_root)):
+#         fold_path = os.path.join(dataset_root, fold)
 #         if not os.path.isdir(fold_path):
 #             continue
             
@@ -648,7 +648,7 @@ def process_all_results(root_dir, num_classes, window_size=5, step=1, methods=No
     # 交差検証のfoldディレクトリ下の各動画フォルダに対してCSVを読み込み、各手法で後処理を実施する。
     
     # ディレクトリ構造例：
-    #   root_dir/
+    #   dataset_root/
     #       fold1/
     #           VideoFolder1/raw_results.csv
     #           VideoFolder2/raw_results.csv
@@ -659,11 +659,11 @@ def process_all_results(root_dir, num_classes, window_size=5, step=1, methods=No
     # """
     
     # # Analyzer クラスのインスタンスを作成
-    # analyzer = Analyzer(root_dir, num_classes)
+    # analyzer = Analyzer(dataset_root, num_classes)
     
     # all_results = {}
-    # for fold in sorted(os.listdir(root_dir)):
-    #     fold_path = os.path.join(root_dir, fold)
+    # for fold in sorted(os.listdir(dataset_root)):
+    #     fold_path = os.path.join(dataset_root, fold)
     #     if not os.path.isdir(fold_path):
     #         continue
     #     all_results[fold] = {}
@@ -753,7 +753,7 @@ def main():
     os.makedirs(save_dir, exist_ok=True)
     
     fold_metrics = process_all_results(
-        root_dir=save_dir,
+        dataset_root=save_dir,
         num_classes=num_classes,
         window_size=16,
         step=1
@@ -784,7 +784,7 @@ def main():
     # save_dir = f"{num_classes}class_results"
     # os.makedirs(save_dir, exist_ok=True)
     
-    # process_all_results(root_dir=save_dir, num_classes=num_classes, window_size=16, step=1, methods=METHODS[1])
+    # process_all_results(dataset_root=save_dir, num_classes=num_classes, window_size=16, step=1, methods=METHODS[1])
     
     # ダミーの推論結果（Inference.run() の出力形式に準拠）を作成
     # results = create_dummy_results(num_frames=50, num_classes=num_classes)

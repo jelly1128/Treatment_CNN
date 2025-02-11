@@ -9,7 +9,7 @@ training:
   max_epochs: 10
   
 paths:
-  root: '/home/tanaka/demo_data'
+  dataset_root: '/home/tanaka/demo_data'
   save_dir: 'debug'
 
 splits:

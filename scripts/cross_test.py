@@ -186,7 +186,7 @@ def test_anomaly_detection_model(config):
         if not os.path.exists(os.path.join(config.paths.save_dir, folder_name)):
             os.mkdir(os.path.join(config.paths.save_dir, folder_name))
         
-        test_dataset = MultiLabelDetectionDatasetForTest(os.path.join(config.paths.root), folder_name, data_transform, config.test.num_classes)
+        test_dataset = MultiLabelDetectionDatasetForTest(os.path.join(config.paths.dataset_root), folder_name, data_transform, config.test.num_classes)
         
         test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=4 * num_gpus)
         

@@ -8,7 +8,7 @@ def create_multilabel_train_dataloaders(config, fold, num_gpus):
     
     パラメータ:
         config (dataclass): 設定
-        fold (tuple): 3つの文字列からなるタプル、それぞれの文字列はスプリットのビデオIDです
+        fold (tuple): 3つの文字列からなるタプル、それぞれの文字列はsplitのビデオIDです
     
     戻り値:
         tuple: train_loader, val_loader

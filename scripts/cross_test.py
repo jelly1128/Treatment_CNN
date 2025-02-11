@@ -32,7 +32,7 @@ from datasets import AnomalyDetectionDatasetForTest, TreatmentClassificationData
 from models import AnomalyDetectionModel, TreatmentClassificationModel, MultiLabelDetectionModel
 from evaluate_afafa import ModelEvaluator
 
-from config.config import load_test_config
+from config.config_loader import load_test_config
 from data.dataloader import create_multilabel_test_dataloaders
 from data.visualization import plot_dataset_samples, show_dataset_stats
 from engine.trainer import Trainer

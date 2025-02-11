@@ -1,7 +1,7 @@
 import os
 import argparse
 
-from config.config import load_test_config
+from config.config_loader import load_test_config
 from engine.tester import Tester
 from utils.torch_utils import get_device_and_num_gpus, set_seed
 from utils.logger import setup_logging

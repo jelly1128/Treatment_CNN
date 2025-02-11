@@ -1,12 +1,13 @@
 import logging
 import argparse
 from pathlib import Path
+from itertools import cycle
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from config.config import load_train_config
+from config.config_loader import load_train_config
 from data.dataloader import create_multilabel_train_dataloaders
 from data.visualization import plot_dataset_samples, show_dataset_stats
 from engine.trainer import Trainer
@@ -55,7 +56,26 @@ from utils.evaluator import ModelEvaluator
 
 # NOW_FOLD = FOLD1
 
-def generage_fold(fold):
+def generate_folds(splits: dict[str, list[str]]) -> dict[str, list[str]]:
+    """
+    fold名とそれに対応するsplitIDを生成。
+
+    パラメータ
+    ----------
+    splits : dict
+        split名をキーとし、splitIDのリストを値とする辞書。
+
+    戻り値
+    -------
+    folds : dict
+        フォールド名をキーとし、splitIDのリストを値とする辞書。
+        splitIDは入力されたsplitから循環的に取得。
+    """
+    split_list = list(splits.values())
+    folds = {}
+    for i in range(len(split_list)):
+        folds[f"FOLD{i+1}"] = list(cycle(split_list))[i:i+3]
+    return folds
 
 def train_val(config, fold):
     # setup
@@ -115,13 +135,21 @@ def main():
     args = parse_args()
     config = load_train_config(args.config)
     
+    ### 要検討 ###
+    # folds = generate_folds(config.splits.root)
+    
     # 結果保存フォルダを作成
-    Path(config.paths.save_dir).mkdir(exist_ok=True)
+    # Path(config.paths.save_dir).mkdir(exist_ok=True)
+    
+    # for fold_name, fold in folds.items():
+    #     fold_path = Path(config.paths.save_dir, fold_name)
+    #     # 結果保存フォルダを作成
+    #     fold_path.mkdir(exist_ok=True)
     
     # ログ設定
     setup_logging(config.paths.save_dir, mode='training')
     
-    train_val(config, NOW_FOLD)
+    # train_val(config, NOW_FOLD)
     
     # train_val(config, NOW_FOLD)
     # for fold_idx, fold in enumerate((FOLD1, FOLD2, FOLD3, FOLD4)):

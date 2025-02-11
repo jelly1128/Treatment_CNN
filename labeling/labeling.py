@@ -1,7 +1,7 @@
 import pandas as pd
 import re
 
-# ラベリングスプリットの定義
+# ラベリングsplitの定義
 LABELING_SPLIT = (
     "20230801-125025-ES06_20230801-125615-es06-hd",
     "20230802-095553-ES09_20230802-101030-es09-hd",
@@ -70,14 +70,14 @@ def convert_to_multilabel(csv_file_path, threshold=0.5):
 
 # 使用例
 if __name__ == "__main__":
-    # # ラベリングスプリットのインデックスを指定
+    # # ラベリングsplitのインデックスを指定
     # split_index = 4
     # csv_file_path = f'/home/tanaka/labeling/15class_1/{LABELING_SPLIT[split_index]}/threshold_results'
 
     # 関数を呼び出して変換を実行
     # convert_to_multilabel(csv_file_path, threshold=0.5)
     
-    # ラベリングスプリットの全てを変換
+    # ラベリングsplitの全てを変換
     for split_index in range(len(LABELING_SPLIT)):
         csv_file_path = f'/home/tanaka/labeling/15class_2/{LABELING_SPLIT[split_index]}/threshold_results'
         convert_to_multilabel(csv_file_path, threshold=0.9)

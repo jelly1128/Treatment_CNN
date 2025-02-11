@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from config.config import load_train_config
+from config.config_loader import load_train_config
 from data.dataloader import create_multilabel_train_dataloaders
 from data.visualization import plot_dataset_samples, show_dataset_stats
 from engine.trainer import Trainer

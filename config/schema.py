@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, RootModel
 
 class TrainingConfig(BaseModel):
     img_size: int
@@ -18,8 +18,12 @@ class PathConfig(BaseModel):
     root: str
     save_dir: str
     model: str | None = None
+    
+class SplitConfig(RootModel[dict[str, list[str]]]):
+    pass
 
 class Config(BaseModel):
     training: TrainingConfig | None = None
     test: TestConfig | None = None
     paths: PathConfig
+    splits: SplitConfig | None = None

@@ -1,9 +1,9 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, RootModel
 
 class TrainingConfig(BaseModel):
-    mode: str
     img_size: int
     num_classes: int
+    model_architecture: str
     pretrained: bool
     freeze_backbone: bool
     learning_rate: float
@@ -11,16 +11,19 @@ class TrainingConfig(BaseModel):
     max_epochs: int
 
 class TestConfig(BaseModel):
-    mode: str
     img_size: int
     num_classes: int
 
 class PathConfig(BaseModel):
-    root: str
+    dataset_root: str
     save_dir: str
     model: str | None = None
+    
+class SplitConfig(RootModel[dict[str, list[str]]]):
+    pass
 
 class Config(BaseModel):
     training: TrainingConfig | None = None
     test: TestConfig | None = None
     paths: PathConfig
+    splits: SplitConfig | None = None

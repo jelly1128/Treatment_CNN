@@ -90,9 +90,6 @@ def process_and_evaluate(input_csv, output_dir, window_size=31):
     
 # タイムラインの可視化関数
 def visualize_timeline(labels, save_dir, filename, num_classes):
-    """
-    マルチラベルタイムラインを可視化して保存
-    """
     # Define the colors for each class
     label_colors = {
         0: (254, 195, 195),       # white

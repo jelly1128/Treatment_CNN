@@ -325,6 +325,54 @@ class Analyzer:
 ###
 # 以下メイン関数下で使用するコード
 ###
+def visualize_timeline(labels, save_dir, filename, num_classes):
+    # Define the colors for each class
+    label_colors = {
+        0: (254, 195, 195),       # white
+        1: (204, 66, 38),         # lugol
+        2: (57, 103, 177),        # indigo
+        3: (96, 165, 53),         # nbi
+        4: (86, 65, 72),          # custom color for label 4
+        5: (159, 190, 183),       # custom color for label 5
+    }
+
+    # Default color for labels not specified in label_colors
+    default_color = (148, 148, 148)
+
+    # Determine the number of images
+    n_images = len(labels)
+    
+    # Set timeline height based on the number of labels
+    timeline_width = n_images
+    # timeline_height = 2 * (n_images // 10)  # 20 pixels per label row (2 rows total)
+    timeline_height = (n_images // 10)  # 20 pixels per label row (1 rows total)
+
+    # Create a blank image for the timeline
+    timeline_image = Image.new('RGB', (timeline_width, timeline_height), (255, 255, 255))
+    draw = ImageDraw.Draw(timeline_image)
+
+    # Iterate over each image (row in the CSV)
+    for i in range(n_images):
+        # Get the predicted labels for the current image
+        label = labels[i]
+        
+        # Calculate the position in the timeline
+        x1 = i * (timeline_width // n_images)
+        x2 = (i + 1) * (timeline_width // n_images)
+        y1 = 0
+        y2 = (n_images // 10)
+        
+        # Get the color for the current label
+        color = label_colors.get(label, default_color)
+        
+        # Draw the rectangle for the label
+        draw.rectangle([x1, y1, x2, y2], fill=color)
+                
+    # Save the image
+    os.makedirs(save_dir, exist_ok=True)
+    timeline_image.save(os.path.join(save_dir, f'{filename}.png'))
+    print(f'Timeline image saved at {os.path.join(save_dir, f"{filename}.png")}')
+
 def load_raw_results(csv_path, num_classes):
     """
     raw_results.csv から画像パス、予測確率、正解ラベルを抽出する関数。
@@ -357,12 +405,45 @@ def load_raw_results(csv_path, num_classes):
     return image_paths, probabilities, labels
 
 
+# def majority_vote(window):
+#     # 各ラベルクラスの出現回数を合計
+#     class_counts = window.sum(axis=0)
+#     # 出現回数が最大のクラスを選択
+#     majority_label = np.argmax(class_counts)
+#     return majority_label
+
+# def majority_vote(window):
+#     """マルチクラス用多数決投票（排他的クラス向け）"""
+#     # 各フレームの予測クラス（argmax）を取得
+#     pred_classes = np.argmax(window, axis=1)
+#     # クラスごとの投票数集計
+#     counts = np.bincount(pred_classes, minlength=window.shape[1])
+#     # 最多得票クラスを選択（同数の場合は確率の平均で判定）
+#     max_votes = np.max(counts)
+#     candidates = np.where(counts == max_votes)[0]
+    
+#     if len(candidates) > 1:
+#         # 同数の場合、ウィンドウ内の確率平均が最大のクラスを選択
+#         mean_probs = np.mean(window[:, candidates], axis=0)
+#         return candidates[np.argmax(mean_probs)]
+#     return np.argmax(counts)
+
+
 def majority_vote(window):
-    # 各ラベルクラスの出現回数を合計
-    class_counts = window.sum(axis=0)
-    # 出現回数が最大のクラスを選択
-    majority_label = np.argmax(class_counts)
-    return majority_label
+    """マルチクラス用多数決投票（クラスインデックス入力対応版）"""
+    # 入力が1次元配列（クラスインデックスのリスト）の場合の処理
+    if isinstance(window, np.ndarray) and window.ndim == 1:
+        counts = np.bincount(window, minlength=6)  # 0～5クラスを想定
+    else:
+        counts = np.bincount(window.flatten(), minlength=6)
+    
+    max_votes = np.max(counts)
+    candidates = np.where(counts == max_votes)[0]
+    
+    if len(candidates) > 1:
+        # 同数の場合、ウィンドウの中央の値を採用
+        return window[len(window)//2]
+    return np.argmax(counts)
 
 # スライディングウィンドウ適用関数
 def apply_sliding_window(predicted_labels, window_size):
@@ -446,126 +527,21 @@ def visualize_timeline(labels, save_dir, filename, n_class):
     print(f'Timeline image saved at {os.path.join(save_dir, f"{filename}.png")}')
     
     
-def process_all_results(dataset_root, num_classes, window_size=5, step=1, methods=None):
-    analyzer = Analyzer(dataset_root, num_classes)
-    fold_metrics = {}
-    all_predictions = []
-    all_true_labels = []
-    
-    for fold in sorted(os.listdir(dataset_root)):
-        fold_path = os.path.join(dataset_root, fold)
-        if not os.path.isdir(fold_path):
-            continue
-            
-        fold_predictions = []
-        fold_true_labels = []
-        
-        for video_folder in sorted(os.listdir(fold_path)):
-            video_path = os.path.join(fold_path, video_folder)
-            csv_path = os.path.join(video_path, 'raw_results.csv')
-            
-            if not os.path.exists(csv_path):
-                logging.warning(f'CSV file not found in {video_path}')
-                continue
-                
-            print(f'Processing {csv_path} ...')
-            image_paths, probabilities, labels = load_raw_results(csv_path, num_classes)
-            
-            # Generate predictions
-            pred_labels = analyzer.threshold_predictions(probabilities)
-            pred_labels_smoothed = apply_sliding_window(pred_labels, window_size=window_size)
-            
-            # Store for fold-level and overall metrics
-            true_labels = [np.argmax(label[:6]) for label in labels]
-            fold_predictions.extend(pred_labels_smoothed)
-            fold_true_labels.extend(true_labels)
-            all_predictions.extend(pred_labels_smoothed)
-            all_true_labels.extend(true_labels)
-            
-            # Calculate and save video-level results
-            cm, metrics = calculate_metrics(true_labels, pred_labels_smoothed)
-            
-            # Save video-level confusion matrix
-            save_confusion_matrix(
-                cm, 
-                os.path.join(video_path, 'confusion_matrix.csv'),
-                normalized=True
-            )
-            
-            pd.DataFrame(metrics).to_csv(
-                os.path.join(video_path, 'metrics.csv'), 
-                index=False
-            )
-            
-            visualize_timeline(
-                labels=pred_labels_smoothed,
-                save_dir=video_path,
-                filename="prediction_timeline",
-                n_class=6
-            )
-        
-        # Calculate and save fold-level results
-        fold_cm, fold_metrics[fold] = calculate_metrics(fold_true_labels, fold_predictions)
-        fold_results_dir = os.path.join(fold_path, 'fold_results')
-        os.makedirs(fold_results_dir, exist_ok=True)
-        
-        # Save fold-level confusion matrix (both raw and normalized)
-        save_confusion_matrix(
-            fold_cm,
-            os.path.join(fold_results_dir, 'fold_confusion_matrix_raw.csv'),
-            normalized=False
-        )
-        save_confusion_matrix(
-            fold_cm,
-            os.path.join(fold_results_dir, 'fold_confusion_matrix_normalized.csv'),
-            normalized=True
-        )
-        
-        pd.DataFrame(fold_metrics[fold]).to_csv(
-            os.path.join(fold_results_dir, 'fold_metrics.csv'),
-            index=False
-        )
-        
-        visualize_timeline(
-            labels=fold_predictions,
-            save_dir=fold_results_dir,
-            filename="fold_prediction_timeline",
-            n_class=6
-        )
-    
-    # Calculate and save overall results
-    overall_cm, overall_metrics = calculate_metrics(all_true_labels, all_predictions)
-    
-    # Save overall confusion matrices
-    save_confusion_matrix(
-        overall_cm,
-        os.path.join(dataset_root, 'overall_confusion_matrix_raw.csv'),
-        normalized=False
-    )
-    save_confusion_matrix(
-        overall_cm,
-        os.path.join(dataset_root, 'overall_confusion_matrix_normalized.csv'),
-        normalized=True
-    )
-    
-    # Save overall metrics summary
-    pd.DataFrame(overall_metrics).to_csv(
-        os.path.join(dataset_root, 'overall_metrics.csv'),
-        index=False
-    )
-    
-    return fold_metrics, overall_metrics
-
 # def process_all_results(dataset_root, num_classes, window_size=5, step=1, methods=None):
 #     analyzer = Analyzer(dataset_root, num_classes)
-#     fold_metrics = {}
+#     fold_metrics_raw = {}
+#     fold_metrics_smoothed = {}
+#     all_predictions_raw = []
+#     all_predictions_smoothed = []
+#     all_true_labels = []
     
 #     for fold in sorted(os.listdir(dataset_root)):
 #         fold_path = os.path.join(dataset_root, fold)
 #         if not os.path.isdir(fold_path):
 #             continue
             
-#         fold_predictions = []
+#         fold_predictions_raw = []
+#         fold_predictions_smoothed = []
 #         fold_true_labels = []
         
 #         for video_folder in sorted(os.listdir(fold_path)):
@@ -580,232 +556,326 @@ def process_all_results(dataset_root, num_classes, window_size=5, step=1, method
 #             image_paths, probabilities, labels = load_raw_results(csv_path, num_classes)
             
 #             # Generate predictions
-#             pred_labels = analyzer.threshold_predictions(probabilities)
-#             pred_labels_smoothed = apply_sliding_window(pred_labels, window_size=window_size)
+#             pred_labels_raw = analyzer.threshold_predictions(probabilities)
+#             pred_labels_raw = np.array([np.argmax(label[:6]) for label in pred_labels_raw])
+#             pred_labels_smoothed = apply_sliding_window(pred_labels_raw, window_size=window_size)
+            
+#             true_labels = [np.argmax(label[:6]) for label in labels]
             
 #             # Store for fold-level metrics
-#             fold_predictions.extend(pred_labels_smoothed)
-#             fold_true_labels.extend([np.argmax(label[:6]) for label in labels])
+#             fold_predictions_raw.extend(pred_labels_raw)
+#             fold_predictions_smoothed.extend(pred_labels_smoothed)
+#             fold_true_labels.extend(true_labels)
             
-#             # Calculate video-level metrics
-#             cm, metrics = calculate_metrics(
-#                 [np.argmax(label[:6]) for label in labels], 
-#                 pred_labels_smoothed
-#             )
+#             # Calculate and save video-level metrics (raw predictions)
+#             cm_raw, metrics_raw = calculate_metrics(true_labels, pred_labels_raw)
+#             save_confusion_matrix(cm_raw, os.path.join(video_path, 'confusion_matrix_raw.csv'))
+#             pd.DataFrame(metrics_raw).to_csv(os.path.join(video_path, 'metrics_raw.csv'), index=False)
             
-#             # Save video-level confusion matrix
-#             cm_df = pd.DataFrame(
-#                 cm, 
-#                 index=[f'True_{i}' for i in range(6)], 
-#                 columns=[f'Pred_{i}' for i in range(6)]
-#             )
-#             cm_df.to_csv(os.path.join(video_path, 'confusion_matrix.csv'))
-            
-#             # Save video-level metrics
-#             pd.DataFrame(metrics).to_csv(
-#                 os.path.join(video_path, 'metrics.csv'), 
-#                 index=False
-#             )
-            
-#             # Generate timeline visualization
-#             visualize_timeline(
-#                 labels=pred_labels_smoothed,
-#                 save_dir=video_path,
-#                 filename="prediction_timeline",
-#                 n_class=6
-#             )
+#             # Calculate and save video-level metrics (smoothed predictions)
+#             cm_smoothed, metrics_smoothed = calculate_metrics(true_labels, pred_labels_smoothed)
+#             save_confusion_matrix(cm_smoothed, os.path.join(video_path, 'confusion_matrix_smoothed.csv'))
+#             pd.DataFrame(metrics_smoothed).to_csv(os.path.join(video_path, 'metrics_smoothed.csv'), index=False)
+        
+#         # Store for overall metrics
+#         all_predictions_raw.extend(fold_predictions_raw)
+#         all_predictions_smoothed.extend(fold_predictions_smoothed)
+#         all_true_labels.extend(fold_true_labels)
         
 #         # Calculate fold-level metrics
-#         fold_cm, fold_metrics[fold] = calculate_metrics(
-#             fold_true_labels, 
-#             fold_predictions
-#         )
-        
-#         # Save fold-level results
 #         fold_results_dir = os.path.join(fold_path, 'fold_results')
 #         os.makedirs(fold_results_dir, exist_ok=True)
         
-#         pd.DataFrame(
-#             fold_cm,
-#             index=[f'True_{i}' for i in range(6)],
-#             columns=[f'Pred_{i}' for i in range(6)]
-#         ).to_csv(os.path.join(fold_results_dir, 'fold_confusion_matrix.csv'))
+#         # Raw predictions
+#         fold_cm_raw, fold_metrics_raw[fold] = calculate_metrics(fold_true_labels, fold_predictions_raw)
+#         save_confusion_matrix(fold_cm_raw, os.path.join(fold_results_dir, 'fold_confusion_matrix_raw.csv'))
+#         pd.DataFrame(fold_metrics_raw[fold]).to_csv(os.path.join(fold_results_dir, 'fold_metrics_raw.csv'), index=False)
         
-#         pd.DataFrame(fold_metrics[fold]).to_csv(
-#             os.path.join(fold_results_dir, 'fold_metrics.csv'),
-#             index=False
-#         )
+#         # Smoothed predictions
+#         fold_cm_smoothed, fold_metrics_smoothed[fold] = calculate_metrics(fold_true_labels, fold_predictions_smoothed)
+#         save_confusion_matrix(fold_cm_smoothed, os.path.join(fold_results_dir, 'fold_confusion_matrix_smoothed.csv'))
+#         pd.DataFrame(fold_metrics_smoothed[fold]).to_csv(os.path.join(fold_results_dir, 'fold_metrics_smoothed.csv'), index=False)
+    
+#     # Calculate and save overall metrics
+#     overall_cm_raw, overall_metrics_raw = calculate_metrics(all_true_labels, all_predictions_raw)
+#     overall_cm_smoothed, overall_metrics_smoothed = calculate_metrics(all_true_labels, all_predictions_smoothed)
+    
+#     save_confusion_matrix(overall_cm_raw, os.path.join(dataset_root, 'overall_confusion_matrix_raw.csv'))
+#     save_confusion_matrix(overall_cm_smoothed, os.path.join(dataset_root, 'overall_confusion_matrix_smoothed.csv'))
+    
+#     return {
+#         'raw': fold_metrics_raw,
+#         'smoothed': fold_metrics_smoothed,
+#         'overall_raw': overall_metrics_raw,
+#         'overall_smoothed': overall_metrics_smoothed
+#     }
+
+
+def process_all_results(dataset_root, num_classes, window_sizes=[3,5,7,9,11,13,15], step=1):
+    analyzer = Analyzer(dataset_root, num_classes)
+    results_by_window = {}
+    
+    for window_size in window_sizes:
+        print(f"\nProcessing window size: {window_size}")
+        fold_metrics_raw = {}
+        fold_metrics_smoothed = {}
+        all_predictions_raw = []
+        all_predictions_smoothed = []
+        all_true_labels = []
         
-#         visualize_timeline(
-#             labels=fold_predictions,
-#             save_dir=fold_results_dir,
-#             filename="fold_prediction_timeline",
-#             n_class=6
-#         )
-    
-#     return fold_metrics
-    # """
-    # 交差検証のfoldディレクトリ下の各動画フォルダに対してCSVを読み込み、各手法で後処理を実施する。
-    
-    # ディレクトリ構造例：
-    #   dataset_root/
-    #       fold1/
-    #           VideoFolder1/raw_results.csv
-    #           VideoFolder2/raw_results.csv
-    #       fold2/
-    #           ...
-    
-    # 結果は辞書形式で返す。
-    # """
-    
-    # # Analyzer クラスのインスタンスを作成
-    # analyzer = Analyzer(dataset_root, num_classes)
-    
-    # all_results = {}
-    # for fold in sorted(os.listdir(dataset_root)):
-    #     fold_path = os.path.join(dataset_root, fold)
-    #     if not os.path.isdir(fold_path):
-    #         continue
-    #     all_results[fold] = {}
-    #     # 各動画フォルダ
-    #     for video_folder in sorted(os.listdir(fold_path)):
-    #         video_path = os.path.join(fold_path, video_folder)
-    #         csv_path = os.path.join(video_path, 'raw_results.csv')
-    #         if os.path.exists(csv_path):
-    #             print(f'Processing {csv_path} ...')
-    #             image_paths, probabilities, labels = load_raw_results(csv_path, num_classes)
-    #             ###
-    #             # コード部分
-    #             ###
-    #             # 50%以上閾値で予測ラベル（マルチラベル）を作成後、シンプルなSliding windowで予測ラベル（シングルラベル）を決定
-    #             pred_labels = analyzer.threshold_predictions(probabilities)
-    #             # print(type(pred_labels))
-    #             pred_labels_smoothed = apply_sliding_window(pred_labels, window_size=window_size)
+        for fold in sorted(os.listdir(dataset_root)):
+            fold_path = os.path.join(dataset_root, fold)
+            if not os.path.isdir(fold_path):
+                continue
                 
+            fold_predictions_raw = []
+            fold_predictions_smoothed = []
+            fold_true_labels = []
+            
+            for video_folder in sorted(os.listdir(fold_path)):
+                video_path = os.path.join(fold_path, video_folder)
+                csv_path = os.path.join(video_path, 'raw_results.csv')
                 
-    #             # break
-    #         else:
-    #             logging.warning(f'CSV file not found in {video_path}')
-    # return all_results    
-
-
-# ----- 各手法の名称定義 ----- #
-# binary_*系は「50%以上閾値」で二値化した後の処理
-# prob_*系は確率ベクトルを直接利用
-METHODS = {
-    1: "binary_simple",
-    2: "binary_center",
-    3: "prob_simple",
-    4: "prob_center",
-    5: "prob_entropy",
-    6: "prob_center_entropy"
-}
-
-# # メトリクス計算・保存
-#                 cm, metrics = calculate_metrics(labels, pred_labels_smoothed)
-#                 metrics_df = pd.DataFrame(metrics)
+                if not os.path.exists(csv_path):
+                    logging.warning(f'CSV file not found in {video_path}')
+                    continue
+                    
+                print(f'Processing {csv_path}')
+                image_paths, probabilities, labels = load_raw_results(csv_path, num_classes)
                 
-#                 # 混同行列を保存
-#                 cm_df = pd.DataFrame(cm, index=[f'True_{i}' for i in range(6)], columns=[f'Pred_{i}' for i in range(6)])
-#                 cm_csv = os.path.join(video_path, f'confusion_matrix_{methods}.csv')
-#                 cm_df.to_csv(cm_csv)
-
-#                 metrics_csv = os.path.join(video_path, 'metrics.csv')
-#                 metrics_df.to_csv(metrics_csv, index=False)
+                pred_labels_raw = analyzer.threshold_predictions(probabilities)
+                pred_labels_raw = np.array([np.argmax(label[:6]) for label in pred_labels_raw])
+                pred_labels_smoothed = apply_sliding_window(pred_labels_raw, window_size=window_size)
                 
-#                 visualize_timeline(
-#                     labels=pred_labels_smoothed,
-#                     save_dir=video_path,
-#                     filename=f"sw_labels",
-#                     n_class=6
-#                 )
+                if window_size == 1:
+                    pred_labels_smoothed = [int(np.argmax(probs[:6])) for probs in probabilities]
                 
-#                 # final_predictions, final_scores = analyzer.sliding_window_postprocessing(folder_probabilities, window_size=5, step=1, method='combined', sigma=1.0)
-#                 # all_results[fold][video_folder] = result
+                true_labels = [np.argmax(label[:6]) for label in labels]
+                
+                # Store for fold-level metrics
+                fold_predictions_raw.extend(pred_labels_raw)
+                fold_predictions_smoothed.extend(pred_labels_smoothed)
+                fold_true_labels.extend(true_labels)
+                
+                # Save results in window size specific directory
+                window_results_dir = os.path.join(video_path, f'window_{window_size}')
+                os.makedirs(window_results_dir, exist_ok=True)
+                
+                # Save video-level metrics
+                for pred_type, preds in [('raw', pred_labels_raw), ('smoothed', pred_labels_smoothed)]:
+                    cm, metrics = calculate_metrics(true_labels, preds)
+                    save_confusion_matrix(cm, os.path.join(window_results_dir, f'confusion_matrix_{pred_type}.csv'))
+                    pd.DataFrame(metrics).to_csv(os.path.join(window_results_dir, f'metrics_{pred_type}.csv'), index=False)
+                    
+                # タイムライン画像生成
+                video_name = os.path.basename(video_folder)
+                timeline_dir = os.path.join(window_results_dir, 'timelines')
+                os.makedirs(timeline_dir, exist_ok=True)
 
-def save_confusion_matrix(cm, save_path, normalized=False):
-    """Save confusion matrix to CSV with optional normalization"""
-    if normalized:
-        # Normalize by row (true labels)
-        row_sums = cm.sum(axis=1, keepdims=True)
-        cm_normalized = np.where(row_sums == 0, 0, cm / row_sums)
-        cm_to_save = cm_normalized
-    else:
-        cm_to_save = cm
+                # 生の予測結果のタイムライン
+                visualize_timeline(
+                    pred_labels_raw, 
+                    timeline_dir, 
+                    f'{video_name}_raw_timeline',
+                    num_classes
+                )
+
+                # 平滑化後の予測結果のタイムライン
+                visualize_timeline(
+                    pred_labels_smoothed,
+                    timeline_dir,
+                    f'{video_name}_smoothed_timeline',
+                    num_classes
+                )
+            
+            # Save fold-level results
+            fold_results_dir = os.path.join(fold_path, f'window_{window_size}/fold_results')
+            os.makedirs(fold_results_dir, exist_ok=True)
+            
+            # Calculate and save fold metrics
+            fold_cm_raw, fold_metrics_raw[fold] = calculate_metrics(fold_true_labels, fold_predictions_raw)
+            fold_cm_smoothed, fold_metrics_smoothed[fold] = calculate_metrics(fold_true_labels, fold_predictions_smoothed)
+            
+            save_confusion_matrix(fold_cm_raw, os.path.join(fold_results_dir, 'fold_confusion_matrix_raw.csv'))
+            save_confusion_matrix(fold_cm_smoothed, os.path.join(fold_results_dir, 'fold_confusion_matrix_smoothed.csv'))
+            
+            all_predictions_raw.extend(fold_predictions_raw)
+            all_predictions_smoothed.extend(fold_predictions_smoothed)
+            all_true_labels.extend(fold_true_labels)
         
+        # Calculate overall metrics for this window size
+        overall_cm_raw, overall_metrics_raw = calculate_metrics(all_true_labels, all_predictions_raw)
+        overall_cm_smoothed, overall_metrics_smoothed = calculate_metrics(all_true_labels, all_predictions_smoothed)
+        
+        window_dir = os.path.join(dataset_root, f'window_{window_size}')
+        os.makedirs(window_dir, exist_ok=True)
+        
+        save_confusion_matrix(overall_cm_raw, os.path.join(window_dir, 'overall_confusion_matrix_raw.csv'))
+        save_confusion_matrix(overall_cm_smoothed, os.path.join(window_dir, 'overall_confusion_matrix_smoothed.csv'))
+        
+        results_by_window[window_size] = {
+            'raw': fold_metrics_raw,
+            'smoothed': fold_metrics_smoothed,
+            'overall_raw': overall_metrics_raw,
+            'overall_smoothed': overall_metrics_smoothed
+        }
+    
+    # Create comprehensive summary across all window sizes
+    create_window_size_comparison(results_by_window, dataset_root)
+    
+    
+    return results_by_window
+
+def create_window_size_comparison(results_by_window, save_dir):
+    """全window_sizeのクラス別指標を比較するCSVを生成"""
+    window_summaries = []
+    
+    for window_size, results in results_by_window.items():
+        # 各クラスの指標を抽出
+        for class_idx in range(6):
+            raw_metrics = next(m for m in results['overall_raw'] if m['Class'] == class_idx)
+            smoothed_metrics = next(m for m in results['overall_smoothed'] if m['Class'] == class_idx)
+            
+            summary = {
+                'window_size': window_size,
+                'class': class_idx,
+                'raw_precision': raw_metrics['Precision'],
+                'raw_recall': raw_metrics['Recall'],
+                'smoothed_precision': smoothed_metrics['Precision'],
+                'smoothed_recall': smoothed_metrics['Recall'],
+                'precision_diff': round(smoothed_metrics['Precision'] - raw_metrics['Precision'], 4),
+                'recall_diff': round(smoothed_metrics['Recall'] - raw_metrics['Recall'], 4)
+            }
+            window_summaries.append(summary)
+    
+    # DataFrameに変換してソート
+    df = pd.DataFrame(window_summaries)
+    df = df.sort_values(['class', 'window_size'])
+    
+    # CSV保存
+    comparison_path = os.path.join(save_dir, 'window_size_class_metrics.csv')
+    df.to_csv(comparison_path, index=False)
+    print(f'Window size comparison saved: {comparison_path}')
+
+# def create_window_size_comparison(results_by_window, save_dir):
+#     """Create summary comparing metrics across different window sizes"""
+#     window_summaries = []
+    
+#     for window_size, results in results_by_window.items():
+#         # For each class
+#         for class_idx in range(6):
+#             summary = {
+#                 'window_size': window_size,
+#                 'class': class_idx,
+#                 'raw_precision': results['overall_raw'][class_idx]['Precision'],
+#                 'raw_recall': results['overall_raw'][class_idx]['Recall'],
+#                 'smoothed_precision': results['overall_smoothed'][class_idx]['Precision'],
+#                 'smoothed_recall': results['overall_smoothed'][class_idx]['Recall']
+#             }
+#             window_summaries.append(summary)
+    
+#     # Save comprehensive summary
+#     pd.DataFrame(window_summaries).to_csv(
+#         os.path.join(save_dir, 'window_size_comparison.csv'),
+#         index=False
+#     )
+
+
+def save_confusion_matrix(cm, save_path):
+    """Save confusion matrix to CSV with both raw and normalized versions"""
+    # Raw confusion matrix
     cm_df = pd.DataFrame(
-        cm_to_save,
+        cm,
         index=[f'True_{i}' for i in range(6)],
         columns=[f'Pred_{i}' for i in range(6)]
     )
     cm_df.to_csv(save_path)
-
+    
+    # Normalized confusion matrix
+    normalized_path = save_path.replace('.csv', '_normalized.csv')
+    row_sums = cm.sum(axis=1, keepdims=True)
+    cm_normalized = np.where(row_sums == 0, 0, cm / row_sums)
+    cm_norm_df = pd.DataFrame(
+        cm_normalized,
+        index=[f'True_{i}' for i in range(6)],
+        columns=[f'Pred_{i}' for i in range(6)]
+    )
+    cm_norm_df.to_csv(normalized_path)
+    
 
 def main():
     logging.basicConfig(level=logging.INFO)
-    num_classes = 15
+    num_classes = 6
     save_dir = f"{num_classes}class_results"
     os.makedirs(save_dir, exist_ok=True)
     
-    logging.basicConfig(level=logging.INFO)
-    num_classes = 15
-    save_dir = f"{num_classes}class_results"
-    os.makedirs(save_dir, exist_ok=True)
-    
-    fold_metrics = process_all_results(
+    # window_sizes = [1,3,5,7, 9,11,13,15,17,19, 21,23, 25,27,29,31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59, 61]
+    window_sizes = [1]
+    results = process_all_results(
         dataset_root=save_dir,
         num_classes=num_classes,
-        window_size=16,
-        step=1
+        window_sizes=window_sizes
     )
+
+# def main():
+#     logging.basicConfig(level=logging.INFO)
+#     num_classes = 15
+#     save_dir = f"{num_classes}class_results"
+#     os.makedirs(save_dir, exist_ok=True)
     
-    # Save overall results summary
-    overall_metrics = pd.DataFrame([
-        {
-            'Fold': fold,
-            **{f'Class_{i}_{metric}': metrics[i][metric] 
-               for i in range(6) 
-               for metric in ['Precision', 'Recall']}
-        }
-        for fold, metrics in fold_metrics.items()
-    ])
+#     metrics = process_all_results(
+#         dataset_root=save_dir,
+#         num_classes=num_classes,
+#         window_size=15,
+#         step=1
+#     )
     
-    overall_metrics.to_csv(
-        os.path.join(save_dir, 'overall_results.csv'),
-        index=False
-    )
+#     # Create summary of all metrics (raw predictions)
+#     raw_summary = pd.DataFrame([
+#         {
+#             'Fold': fold,
+#             **{f'Class_{i}_{metric}': fold_metrics[i][metric] 
+#                for i in range(6) 
+#                for metric in ['Precision', 'Recall']}
+#         }
+#         for fold, fold_metrics in metrics['raw'].items()
+#     ])
     
-    # logging.basicConfig(level=logging.INFO)
+#     # Add overall results
+#     raw_summary = pd.concat([
+#         raw_summary,
+#         pd.DataFrame([{
+#             'Fold': 'Overall',
+#             **{f'Class_{i}_{metric}': metrics['overall_raw'][i][metric]
+#                for i in range(6)
+#                for metric in ['Precision', 'Recall']}
+#         }])
+#     ])
     
-    # # クラス数（例: 15クラスの場合）
-    # num_classes = 15
+#     raw_summary.to_csv(os.path.join(save_dir, 'metrics_summary_raw.csv'), index=False)
     
-    # # 結果を保存するディレクトリ（存在しなければ作成）
-    # save_dir = f"{num_classes}class_results"
-    # os.makedirs(save_dir, exist_ok=True)
+#     # Repeat for smoothed predictions
+#     smoothed_summary = pd.DataFrame([
+#         {
+#             'Fold': fold,
+#             **{f'Class_{i}_{metric}': fold_metrics[i][metric] 
+#                for i in range(6) 
+#                for metric in ['Precision', 'Recall']}
+#         }
+#         for fold, fold_metrics in metrics['smoothed'].items()
+#     ])
     
-    # process_all_results(dataset_root=save_dir, num_classes=num_classes, window_size=16, step=1, methods=METHODS[1])
+#     smoothed_summary = pd.concat([
+#         smoothed_summary,
+#         pd.DataFrame([{
+#             'Fold': 'Overall',
+#             **{f'Class_{i}_{metric}': metrics['overall_smoothed'][i][metric]
+#                for i in range(6)
+#                for metric in ['Precision', 'Recall']}
+#         }])
+#     ])
     
-    # ダミーの推論結果（Inference.run() の出力形式に準拠）を作成
-    # results = create_dummy_results(num_frames=50, num_classes=num_classes)
-    
-    # Analyzer.analyze() を呼び出して、以下の処理を実施する
-    # ・生の結果のCSV保存 (raw_results.csv)
-    # ・50%閾値でのバイナリ予測結果の作成・保存 (threshold_results.csv)
-    # ・各クラスごとの適合率、再現率、混同行列、分類レポートの算出 (metrics.csv, confusion_matrix.csv)
-    # ・マルチラベルのタイムライン画像と正解タイムライン画像の作成
-    # analyzer.analyze(results)
-    
-    # また、もしスライディングウィンドウ後処理の関数を個別に利用する場合は、
-    # 以下のように Analyzer.postprocess_results() を呼び出すこともできます。
-    # （メソッド内では Analyzer.sliding_window_postprocessing() を利用しています）
-    # window_size = 16
-    # step = 1
-    # postprocessed_results = analyzer.postprocess_results(results, window_size=window_size, step=step, method='combined', sigma=1.0)
-    # logging.info("Postprocessing complete.")
-    
-    # ここで、postprocessed_results には各フォルダごとに (final_predictions, final_scores) が保存されているので、
-    # さらに個別の評価指標やタイムライン画像の生成に利用可能です。
-    
+#     smoothed_summary.to_csv(os.path.join(save_dir, 'metrics_summary_smoothed.csv'), index=False)
+
 if __name__ == '__main__':
     main()

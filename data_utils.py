@@ -36,7 +36,7 @@ def setup_data(config):
     train_datasets_list = []
     # ここでは Fold の前半 2 分割を訓練データに使用
     for split in [NOW_FOLD[0], NOW_FOLD[1]]:
-        dataset = MultiLabelDetectionDataset(root_dir=config.paths.root,
+        dataset = MultiLabelDetectionDataset(dataset_root=config.paths.dataset_root,
                                              transform=train_data_transforms,
                                              num_classes=config.training.num_classes,
                                              split=split)
@@ -44,7 +44,7 @@ def setup_data(config):
     train_datasets = ConcatDataset(train_datasets_list)
     
     # 残りの分割を検証用データとする
-    val_datasets = MultiLabelDetectionDataset(root_dir=config.paths.root,
+    val_datasets = MultiLabelDetectionDataset(dataset_root=config.paths.dataset_root,
                                                transform=val_data_transforms,
                                                num_classes=config.training.num_classes,
                                                split=NOW_FOLD[2])

@@ -18,7 +18,7 @@ from utils.logger import setup_logging
 from utils.training_monitor import TrainingMonitor
 
 
-def train_val(config: dict, train_data_dirs: list, val_data_dirs: list, fold_idx: int):
+def train_val(config: dict, train_data_dirs: list, val_data_dirs: list):
     # setup
     device, num_gpus = get_device_and_num_gpus()
     set_seed(42)
@@ -90,16 +90,17 @@ def main():
     # ログ設定
     setup_logging(config.paths.save_dir, mode='training')
     
-    # dataloaderの作成
+    # データ分割
+    # 各foldのtrain/val/test用フォルダ名リストを取得
     splitter = CrossValidationSplitter(splits=config.splits.root)
     split_folders = splitter.get_split_folders()
     
     # debug
-    # fold1のtrainとvalのデータディレクトリを取得
+    # fold_idx=0のtrainとvalのデータディレクトリを取得
     train_data_dirs = split_folders[0]['train']
     val_data_dirs = split_folders[0]['val']
     
-    train_val(config, train_data_dirs, val_data_dirs, fold_idx=0)
+    train_val(config, train_data_dirs, val_data_dirs)
 
 if __name__ == '__main__':
     main()

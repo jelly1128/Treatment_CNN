@@ -18,14 +18,10 @@ from utils.logger import setup_logging
 from utils.training_monitor import TrainingMonitor
 
 
-def train_val(config: dict, train_data_dirs: list, val_data_dirs: list, fold_idx: int):
+def train_val(config: dict, train_data_dirs: list, val_data_dirs: list):
     # setup
     device, num_gpus = get_device_and_num_gpus()
     set_seed(42)
-    
-    # debug
-    train_data_dirs = train_data_dirs[fold_idx]
-    val_data_dirs = val_data_dirs[fold_idx]
     
     # visualize
     # plot_dataset_samples(config.paths.save_dir, train_data_dirs)
@@ -100,11 +96,11 @@ def main():
     split_folders = splitter.get_split_folders()
     
     # debug
-    # fold1のtrainとvalのデータディレクトリを取得
-    train_data_dirs = split_folders['train']
-    val_data_dirs = split_folders['val']
+    # fold_idx=0のtrainとvalのデータディレクトリを取得
+    train_data_dirs = split_folders[0]['train']
+    val_data_dirs = split_folders[0]['val']
     
-    train_val(config, train_data_dirs, val_data_dirs, fold_idx=0)
+    train_val(config, train_data_dirs, val_data_dirs)
 
 if __name__ == '__main__':
     main()

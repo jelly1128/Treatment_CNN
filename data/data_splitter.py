@@ -49,18 +49,18 @@ class CrossValidationSplitter:
         for test_idx in range(self.n_splits):
             # インデックスの取得
             train_indices = self._get_circular_indices(
-                test_idx + 1, 
+                test_idx, 
                 self.split_config.TRAIN_SIZE
             )
             val_indices = self._get_circular_indices(
-                test_idx + 1 + self.split_config.TRAIN_SIZE,
+                test_idx + self.split_config.TRAIN_SIZE,
                 self.split_config.VAL_SIZE
             )
             
             # split名の取得
             train_splits = [split_names[i] for i in train_indices]
             val_split = split_names[val_indices[0]]
-            test_split = split_names[test_idx]
+            test_split = split_names[(test_idx + self.n_splits - 1) % self.n_splits]
             
             fold_splits.append({
                 DatasetType.TRAIN.value: train_splits,

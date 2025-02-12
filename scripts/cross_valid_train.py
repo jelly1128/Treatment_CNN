@@ -23,6 +23,10 @@ def train_val(config: dict, train_data_dirs: list, val_data_dirs: list, fold_idx
     device, num_gpus = get_device_and_num_gpus()
     set_seed(42)
     
+    # debug
+    train_data_dirs = train_data_dirs[fold_idx]
+    val_data_dirs = val_data_dirs[fold_idx]
+    
     # visualize
     # plot_dataset_samples(config.paths.save_dir, train_data_dirs)
     # show_dataset_stats(train_data_dirs)
@@ -90,14 +94,15 @@ def main():
     # ログ設定
     setup_logging(config.paths.save_dir, mode='training')
     
-    # dataloaderの作成
+    # データ分割
+    # 各foldのtrain/val/test用フォルダ名リストを取得
     splitter = CrossValidationSplitter(splits=config.splits.root)
     split_folders = splitter.get_split_folders()
     
     # debug
     # fold1のtrainとvalのデータディレクトリを取得
-    train_data_dirs = split_folders[0]['train']
-    val_data_dirs = split_folders[0]['val']
+    train_data_dirs = split_folders['train']
+    val_data_dirs = split_folders['val']
     
     train_val(config, train_data_dirs, val_data_dirs, fold_idx=0)
 

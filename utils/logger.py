@@ -28,9 +28,8 @@ def setup_logging(save_dir: str, mode='training') -> logging.Logger:
     
     logger = logging.getLogger(mode)
     logger.setLevel(logging.INFO)
-    
-    if logger.hasHandlers():
-        logger.handlers.clear()
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
         
     # ログフォーマット
     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
@@ -47,4 +46,7 @@ def setup_logging(save_dir: str, mode='training') -> logging.Logger:
     logger.addHandler(file_handler)
     logger.addHandler(stream_handler)
     
-    return logger
+    # `basicConfig` を設定
+    logging.basicConfig(level=logging.INFO, handlers=[file_handler, stream_handler])
+
+    logging.info(f"Logging initialized. Logs will be saved in {save_dir / f'{mode}.log'}")

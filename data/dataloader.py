@@ -1,5 +1,5 @@
 from torch.utils.data import Dataset, DataLoader, ConcatDataset
-from .datasets import MultiLabelDetectionDataset, MultiLabelDetectionDatasetForTest
+from .datasets import BaseMultiLabelDataset, MultiLabelDetectionDataset, MultiLabelDetectionDatasetForTest
 from .transforms import get_train_transforms, get_test_transforms
 
 def create_multilabel_train_dataloaders(config, num_gpus, train_data):
@@ -88,12 +88,13 @@ class DataLoaderFactory:
         """
         return DataLoader(
             dataset,
-            batch_size=batch_size * self.num_gpus,
+            batch_size=(1 if batch_size == 1 
+                        else batch_size * self.num_gpus),  # 条件式を直接埋め込み
             shuffle=shuffle,
             num_workers=4 * self.num_gpus
         )
 
-    def create_train_val_dataloaders(self, train_data_dirs: list, val_data_dirs: tuple):
+    def create_multilabel_dataloaders(self, train_data_dirs: list, val_data_dirs: list) -> tuple[DataLoader, DataLoader]:
         """
         訓練と検証用のデータローダーを作成する
 
@@ -104,25 +105,24 @@ class DataLoaderFactory:
         戻り値:
             tuple: train_loader, val_loader
         """
-        train_data_paths = []
-        for data_dir in train_data_dirs:
-            train_data_
-        
         # 訓練用データローダーの作成
-        train_dataset = MultiLabelDetectionDataset()
-        train_loader = self.create_dataloader(train_data_dirs, self.batch_size, shuffle=True)
+        train_dataset = BaseMultiLabelDataset(self.dataset_root,
+                                              train_data_dirs,
+                                              get_train_transforms(),
+                                              self.num_classes,
+                                              )
+        train_loader = self.create_dataloader(train_dataset, self.batch_size, shuffle=True)
         # 検証用データローダーの作成
-        val_dataset = MultiLabelDetectionDataset(
-            self.dataset_root,
-            val_data_dir,
-            get_test_transforms(),
-            self.num_classes
-        )
+        val_dataset = BaseMultiLabelDataset(self.dataset_root,
+                                            val_data_dirs,
+                                            get_test_transforms(),
+                                            self.num_classes,
+                                            )
         val_loader = self.create_dataloader(val_dataset, self.batch_size, shuffle=False)
 
         return train_loader, val_loader
 
-    def create_test_dataloaders(self, splits):
+    def create_multilabel_test_dataloaders(self, test_data_dirs: list) -> dict[str, DataLoader]:
         """
         テスト用のデータローダーを作成する
 
@@ -133,39 +133,12 @@ class DataLoaderFactory:
             dict: テスト用データローダーの辞書
         """
         test_dataloaders = {}
-        for split in splits:
-            test_dataset = MultiLabelDetectionDatasetForTest(
+        for test_data_dir in test_data_dirs:
+            test_dataset = BaseMultiLabelDataset(
                 self.dataset_root,
-                split,
+                [test_data_dir],
                 get_test_transforms(),
                 self.num_classes
             )
-            test_dataloaders[split] = self.create_dataloader(test_dataset, batch_size=1, shuffle=False)
+            test_dataloaders[test_data_dir] = self.create_dataloader(test_dataset, batch_size=1, shuffle=False)
         return test_dataloaders
-
-# 使用例
-# config = ...  # 設定を読み込む
-# num_gpus = 2  # GPUの数
-
-# # configから必要な情報を抽出
-# dataset_root = config.paths.dataset_root
-# batch_size = config.training.batch_size
-# num_classes = config.training.num_classes
-
-# # ファクトリのインスタンスを作成
-# factory = DataLoaderFactory(dataset_root, batch_size, num_classes, num_gpus)
-
-# # 訓練と検証用データローダーの作成
-# train_splits = [MultiLabelDetectionDataset(dataset_root,
-#                                           transform=get_train_transforms(),
-#                                           num_classes=num_classes,
-#                                           split=split) 
-#                 for split in fold[:2]]
-# val_split = MultiLabelDetectionDataset(dataset_root,
-#                                       transform=get_test_transforms(),
-#                                       num_classes=num_classes,
-#                                       split=fold[2])
-# train_loader, val_loader = factory.create_train_val_dataloaders(train_splits, val_split)
-
-# # テスト用データローダーの作成
-# test_dataloaders = factory.create_test_dataloaders(test_splits)

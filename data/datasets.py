@@ -1,10 +1,10 @@
-import os
+from pathlib import Path
 from PIL import Image
 from torch.utils.data import Dataset
-from typing import Tuple, List, Dict
 import csv
 import torch
 from torchvision.utils import make_grid
+import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -27,7 +27,7 @@ class CustomDataset(Dataset):
         # print(csv_files)
         
         # サブフォルダ
-        self.subfolder_names = [name for name in os.listdir(dataset_root) if os.path.isdir(os.path.join(dataset_root, name))]
+        self.subfolder_names = [name for name in Path(dataset_root).iterdir() if name.is_dir()]
         print(self.subfolder_names)
         # for csv_file in csv_files:
         for subfolder_name in self.subfolder_names:
@@ -36,9 +36,9 @@ class CustomDataset(Dataset):
                 for row in reader:
                     label = int(row[1])
                     if anomaly_detector:
-                        self.img_dict[os.path.join(subfolder_name, row[0])] = label
+                        self.img_dict[subfolder_name / row[0]] = label
                     elif label < TREATMENT_CLASS:
-                        self.img_dict[os.path.join(subfolder_name, row[0])] = label
+                        self.img_dict[subfolder_name / row[0]] = label
                     # print(os.path.join(subfolder_name, row[0]))
 
     def __len__(self):
@@ -47,7 +47,7 @@ class CustomDataset(Dataset):
     def __getitem__(self, idx):
         img_names = list(self.img_dict.keys())
         # print(img_names)
-        img_path = os.path.join(self.dataset_root, img_names[idx])
+        img_path = self.dataset_root / img_names[idx]
         label = self.img_dict[img_names[idx]]
 
         image = Image.open(img_path).convert("RGB")
@@ -59,7 +59,7 @@ class CustomDataset(Dataset):
 
 
 class BaseDataset(Dataset):
-    def __init__(self, dataset_root: str, transform=None):
+    def __init__(self, dataset_root: str, transform: transforms.Compose = None):
         """
         基本的なデータセットクラスの初期化
         
@@ -71,7 +71,7 @@ class BaseDataset(Dataset):
         self.transform = transform
         
         # ルートディレクトリ下のサブフォルダ名のリストを取得
-        self.subfolder_names = [name for name in os.listdir(dataset_root) if os.path.isdir(os.path.join(dataset_root, name))]
+        self.subfolder_names = [name for name in Path(dataset_root).iterdir() if name.is_dir()]
         print(self.subfolder_names)
         
         self._load_data()
@@ -86,7 +86,7 @@ class BaseDataset(Dataset):
         """データセットの長さを返す"""
         return len(self.img_dict)
 
-    def __getitem__(self, idx) -> Tuple[torch.Tensor, str, int]:
+    def __getitem__(self, idx) -> tuple[torch.Tensor, str, int]:
         """
         指定されたインデックスのデータ項目を取得
         
@@ -94,7 +94,7 @@ class BaseDataset(Dataset):
         :return: (画像テンソル, 画像パス, ラベル)のタプル
         """
         img_names = list(self.img_dict.keys())
-        img_path = os.path.join(self.dataset_root, img_names[idx])
+        img_path = self.dataset_root / img_names[idx]
         label = self.img_dict[img_names[idx]]
 
         image = Image.open(img_path).convert("RGB")
@@ -106,7 +106,7 @@ class BaseDataset(Dataset):
     
     
 class AnomalyDetectionDataset(BaseDataset):
-    def __init__(self, dataset_root: str, transform, num_classes: int):
+    def __init__(self, dataset_root: str, transform: transforms.Compose, num_classes: int):
         self.num_classes = num_classes
         super().__init__(dataset_root, transform)
         
@@ -123,7 +123,7 @@ class AnomalyDetectionDataset(BaseDataset):
                         original_label = int(row[1])
                         # 4未満は0、4以上は1に変更
                         label = 0 if original_label < TREATMENT_CLASS else 1
-                        self.img_dict[os.path.join(subfolder_name, row[0])] = label
+                        self.img_dict[subfolder_name / row[0]] = label
                         
         elif self.num_classes == 4: # 正常4クラス(時系列無し処置分類)
             # 各サブフォルダに対応するcsvファイルを読み込み，画像パスとラベルを辞書に格納する
@@ -134,7 +134,7 @@ class AnomalyDetectionDataset(BaseDataset):
                         label = int(row[1])
                         # 異常クラス(4~)なら4に統一
                         if label < TREATMENT_CLASS:
-                            self.img_dict[os.path.join(subfolder_name, row[0])] = label
+                            self.img_dict[subfolder_name / row[0]] = label
                             
         elif self.num_classes == 5: # 正常4クラス/異常1クラス
             # 各サブフォルダに対応するcsvファイルを読み込み，画像パスとラベルを辞書に格納する
@@ -146,7 +146,7 @@ class AnomalyDetectionDataset(BaseDataset):
                         # 異常クラス(4~)なら4に統一
                         if label >= TREATMENT_CLASS:
                             label = 4
-                        self.img_dict[os.path.join(subfolder_name, row[0])] = label
+                        self.img_dict[subfolder_name / row[0]] = label
                         
         else:
             for subfolder_name in self.subfolder_names:
@@ -154,11 +154,11 @@ class AnomalyDetectionDataset(BaseDataset):
                     reader = csv.reader(file)
                     for row in reader:
                         label = int(row[1])
-                        self.img_dict[os.path.join(subfolder_name, row[0])] = label
+                        self.img_dict[subfolder_name / row[0]] = label
                     
 
 class TreatmentClassificationDataset(BaseDataset):
-    def __init__(self, dataset_root: str, n_image: int, transform=None):
+    def __init__(self, dataset_root: str, n_image: int, transform: transforms.Compose = None):
         """
         時系列データセットクラスの初期化
         
@@ -182,9 +182,9 @@ class TreatmentClassificationDataset(BaseDataset):
                 for row in reader:
                     label = int(row[1])
                     if label < TREATMENT_CLASS:
-                        self.img_dict[os.path.join(subfolder_name, row[0])] = label
+                        self.img_dict[subfolder_name / row[0]] = label
                         
-    def create_dataset(self) -> List[Tuple[Tuple[str, ...], int]]:
+    def create_dataset(self) -> list[tuple[tuple[str, ...], int]]:
         """
         n_image枚ずつのサンプルを作成する
 
@@ -210,7 +210,7 @@ class TreatmentClassificationDataset(BaseDataset):
 
         return dataset
     
-    def get_label_counts(self) -> Dict[int, int]:
+    def get_label_counts(self) -> dict[int, int]:
         """
         ラベルごとのデータ数を取得する
         
@@ -229,14 +229,14 @@ class TreatmentClassificationDataset(BaseDataset):
         """データセットの長さを返す"""
         return len(self.dataset)
 
-    def __getitem__(self, idx) -> Tuple[torch.Tensor, Tuple[str, ...], torch.Tensor]:
+    def __getitem__(self, idx) -> tuple[torch.Tensor, tuple[str, ...], torch.Tensor]:
         """
         指定されたインデックスのデータ項目を取得
         Returns:
             Tuple[torch.Tensor, Tuple[str, ...], torch.Tensor]: 画像テンソル、画像パスのタプル、ラベルテンソル
         """
         img_paths, label = self.dataset[idx]
-        images = [Image.open(os.path.join(self.dataset_root, img_path)).convert("RGB") for img_path in img_paths]
+        images = [Image.open(self.dataset_root / img_path).convert("RGB") for img_path in img_paths]
 
         if self.transform:
             images = [self.transform(image) for image in images]
@@ -250,10 +250,10 @@ class TreatmentClassificationDataset(BaseDataset):
         :param output_dir: 出力ディレクトリ
         :param max_images_per_label: 各ラベルで保存する最大画像数
         """
-        os.makedirs(output_dir, exist_ok=True)
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
         
         # ラベルごとに画像を集める
-        images_by_label: Dict[int, List[torch.Tensor]] = {}
+        images_by_label: dict[int, list[torch.Tensor]] = {}
         for idx in range(len(self)):
             images, _, label = self[idx]
             if label not in images_by_label:
@@ -273,14 +273,14 @@ class TreatmentClassificationDataset(BaseDataset):
             plt.imshow(grid.permute(1, 2, 0))
             plt.axis('off')
             plt.title(f'Label: {label}')
-            plt.savefig(os.path.join(output_dir, f'label_{label}.png'))
+            plt.savefig(output_dir / f'label_{label}.png')
             plt.close()
 
         print(f"Images saved in {output_dir}")
 
 
 class BaseDatasetForTest(Dataset):
-    def __init__(self, root_path: str, transform=None):
+    def __init__(self, root_path: str, transform: transforms.Compose = None):
         """
         基本的なテスト用データセットクラスの初期化
         
@@ -302,7 +302,7 @@ class BaseDatasetForTest(Dataset):
         """データセットの長さを返す"""
         return len(self.img_dict)
 
-    def __getitem__(self, idx) -> Tuple[torch.Tensor, str, int]:
+    def __getitem__(self, idx) -> tuple[torch.Tensor, str, int]:
         """
         指定されたインデックスのデータ項目を取得
         
@@ -310,7 +310,7 @@ class BaseDatasetForTest(Dataset):
         :return: (画像テンソル, 画像パス, ラベル)のタプル
         """
         img_names = list(self.img_dict.keys())
-        img_path = os.path.join(self.dataset_root, img_names[idx])
+        img_path = self.dataset_root / img_names[idx]
         label = self.img_dict[img_names[idx]]
 
         image = Image.open(img_path).convert("RGB")
@@ -322,7 +322,7 @@ class BaseDatasetForTest(Dataset):
 
     
 class AnomalyDetectionDatasetForTest(Dataset):
-    def __init__(self, root_path: str, test_dir: str, transform, num_classes: int):
+    def __init__(self, root_path: str, test_dir: str, transform: transforms.Compose, num_classes: int):
         
         """
         基本的なテスト用データセットクラスの初期化
@@ -330,7 +330,7 @@ class AnomalyDetectionDatasetForTest(Dataset):
         :param root_path: データセットのルートディレクトリ    ex) data/test/olympus
         :param transform: 画像変換用の関数（オプション）
         """
-        self.test_dir_path = os.path.join(root_path, test_dir)
+        self.test_dir_path = Path(root_path) / test_dir
         self.img_dict = {}               # 画像ファイル名とラベルを格納する辞書
         self.transform = transform
         # print(f"test_dir_path {self.test_dir_path}")
@@ -379,7 +379,7 @@ class AnomalyDetectionDatasetForTest(Dataset):
         """データセットの長さを返す"""
         return len(self.img_dict)
     
-    def __getitem__(self, idx) -> Tuple[torch.Tensor, str, int]:
+    def __getitem__(self, idx) -> tuple[torch.Tensor, str, int]:
         """
         指定されたインデックスのデータ項目を取得
         
@@ -388,7 +388,7 @@ class AnomalyDetectionDatasetForTest(Dataset):
         """
         img_names = list(self.img_dict.keys())
         # img_path = img_names[idx]
-        img_path = os.path.join(self.test_dir_path, img_names[idx])
+        img_path = self.test_dir_path / img_names[idx]
         label = self.img_dict[img_names[idx]]
 
         image = Image.open(img_path).convert("RGB")
@@ -400,7 +400,7 @@ class AnomalyDetectionDatasetForTest(Dataset):
 
 
 class TreatmentClassificationDatasetForTest(Dataset):
-    def __init__(self, dataset_root: str, data: list, n_image: int, transform):
+    def __init__(self, dataset_root: str, data: list, n_image: int, transform: transforms.Compose):
         """
         時系列データセットクラスの初期化
         
@@ -416,14 +416,14 @@ class TreatmentClassificationDatasetForTest(Dataset):
     def __getitem__(self, idx):
         image_paths = [self.data[idx + i][0] for i in range(self.n_image)]
         ground_truth = self.data[idx + self.n_image - 1][1]
-        images = [Image.open(os.path.join(self.dataset_root, image_path)).convert("RGB") for image_path in image_paths]
+        images = [Image.open(self.dataset_root / image_path).convert("RGB") for image_path in image_paths]
         images = [self.transform(image) for image in images]
         
         return torch.stack(images, dim=0), image_paths[-1], ground_truth   # n_image枚の画像とn_image枚目のパスとラベル
 
 
 class MultiLabelDetectionDataset(Dataset):
-    def __init__(self, dataset_root: str, transform: callable, num_classes: int, split: tuple) -> None:
+    def __init__(self, dataset_root: str, transform: transforms.Compose, num_classes: int, split: tuple) -> None:
         """
         Initialize a basic dataset class for testing purposes.
 
@@ -443,7 +443,7 @@ class MultiLabelDetectionDataset(Dataset):
 
         # Read the CSV files in each subfolder and store the image file names and labels.
         for subfolder in self.split:
-            with open(os.path.join(self.dataset_root, subfolder + '.csv'), 'r') as file:
+            with open(self.dataset_root / (subfolder + '.csv'), 'r') as file:
                 reader = csv.reader(file)
                 for row in reader:
                     labels = [int(label) for label in row[1:] if label.isdigit()]
@@ -457,13 +457,13 @@ class MultiLabelDetectionDataset(Dataset):
 
                     labels.sort()  # Sort the labels in ascending order.
                     # print(f'labels: {labels}')
-                    self.image_dict[os.path.join(subfolder, row[0])] = labels
+                    self.image_dict[subfolder / row[0]] = labels
     
     def __len__(self) -> int:
         """データセットの長さを返す"""
         return len(self.img_dict)
     
-    def __getitem__(self, idx) -> Tuple[torch.Tensor, str, int]:
+    def __getitem__(self, idx) -> tuple[torch.Tensor, str, int]:
         """
         指定されたインデックスのデータ項目を取得
         
@@ -471,7 +471,7 @@ class MultiLabelDetectionDataset(Dataset):
         :return: (画像テンソル, 画像パス, ラベル)のタプル
         """
         img_names = list(self.img_dict.keys())
-        img_path = os.path.join(self.dataset_root, img_names[idx])
+        img_path = self.dataset_root / img_names[idx]
         labels = self.img_dict[img_names[idx]]
 
         image = Image.open(img_path).convert("RGB")
@@ -490,7 +490,7 @@ class MultiLabelDetectionDataset(Dataset):
     
     
 class MultiLabelDetectionDatasetForTest(Dataset):
-    def __init__(self, root_path: str, test_dir: str, transform: callable, num_classes: int) -> None:
+    def __init__(self, root_path: str, test_dir: str, transform: transforms.Compose, num_classes: int) -> None:
         
         """
         基本的なテスト用データセットクラスの初期化
@@ -498,7 +498,7 @@ class MultiLabelDetectionDatasetForTest(Dataset):
         :param root_path: データセットのルートディレクトリ    ex) data/test/olympus
         :param transform: 画像変換用の関数（オプション）
         """
-        self.test_dir_path = os.path.join(root_path, test_dir)
+        self.test_dir_path = Path(root_path) / test_dir
         self.img_dict = {}               # 画像ファイル名とラベルを格納する辞書
         self.transform = transform
         self.num_classes = num_classes
@@ -519,13 +519,13 @@ class MultiLabelDetectionDatasetForTest(Dataset):
                     
                 labels.sort()  # 昇順にソート
                 # print(row, labels)
-                self.img_dict[os.path.join(row[0])] = labels
+                self.img_dict[row[0]] = labels
     
     def __len__(self):
         """データセットの長さを返す"""
         return len(self.img_dict)
     
-    def __getitem__(self, idx) -> Tuple[torch.Tensor, str, int]:
+    def __getitem__(self, idx) -> tuple[torch.Tensor, str, int]:
         """
         指定されたインデックスのデータ項目を取得
         
@@ -534,7 +534,7 @@ class MultiLabelDetectionDatasetForTest(Dataset):
         """
         img_names = list(self.img_dict.keys())
         # img_path = img_names[idx]
-        img_path = os.path.join(self.test_dir_path, img_names[idx])
+        img_path = self.test_dir_path / img_names[idx]
         labels = self.img_dict[img_names[idx]]
 
         image = Image.open(img_path).convert("RGB")
@@ -550,149 +550,140 @@ class MultiLabelDetectionDatasetForTest(Dataset):
         # print(img_names[idx], one_hot_label)
 
         return image, img_names[idx], one_hot_label
-    
-    
 
-# import csv
-# from PIL import Image
-# import torch
-# from torch.utils.data import Dataset
-# from torch import Tensor
-# import torchvision.transforms as transforms
+class BaseMultiLabelDataset(Dataset):
+    """
+    マルチラベルデータセットの基底クラス。
+    共通のロジックを実装し、派生クラスで特定の動作を定義する。
+    """
+    def __init__(
+        self,
+        dataset_root: str,
+        data_dirs: list[str],
+        transform: transforms.Compose,
+        num_classes: int,
+    ) -> None:
+        """
+        初期化メソッド。
 
+        Args:
+            dataset_root (str): データセットのルートディレクトリ。
+            transform (Callable): 画像に適用する変換関数。
+            num_classes (int): クラス数。
+        """
+        self.dataset_root = Path(dataset_root)
+        self.data_dirs = data_dirs
+        self.transform = transform
+        self.num_classes = num_classes
+        self.image_dict: dict[str, list[int]] = {}  # 画像パスとラベルの辞書
 
-# class BaseMultiLabelDataset(Dataset):
-#     """
-#     マルチラベルデータセットの基底クラス。
-#     共通のロジックを実装し、派生クラスで特定の動作を定義する。
-#     """
-#     def __init__(
-#         self,
-#         dataset_root: str,
-#         transform: transforms.Compose,
-#         num_classes: int,
-#     ) -> None:
-#         """
-#         初期化メソッド。
+        self._load_labels()
 
-#         Args:
-#             dataset_root (str): データセットのルートディレクトリ。
-#             transform (Callable): 画像に適用する変換関数。
-#             num_classes (int): クラス数。
-#             split (List[str], optional): データセットの分割名リスト（訓練/検証用）。
-#             test_dir (str, optional): テストデータのディレクトリ名（テスト用）。
-#         """
-#         self.dataset_root = dataset_root
-#         self.transform = transform
-#         self.num_classes = num_classes
-#         self.image_dict: Dict[str, List[int]] = {}  # 画像パスとラベルの辞書
+    def _load_labels(self) -> None:
+        """ラベルを読み込む共通メソッド。"""
+        for data_dir in self.data_dirs:
+            self._load_labels_from_csv(self.dataset_root / f"{data_dir}.csv")
+        # if self.data_dirs:
+        #     # 訓練/検証用データセットの場合
+        #     for data_dir in self.data_dirs:
+        #         self._load_labels_from_csv(self.dataset_root / f"{data_dir}.csv")
+        # elif self.test_dir:
+        #     # テスト用データセットの場合
+        #     self._load_labels_from_csv(self.dataset_root / f"{self.test_dir}.csv")
 
-#         self._load_labels()
+    def _load_labels_from_csv(self, csv_path: Path) -> None:
+        """CSVファイルからラベルを読み込む。"""
+        with open(csv_path, mode="r") as file:
+            reader = csv.reader(file)
+            for row in reader:
+                labels = [int(label) for label in row[1:] if label.strip().isdigit()]
+                labels = self._filter_labels(labels)
+                labels.sort()  # ラベルを昇順にソート
+                self.image_dict[self.dataset_root / csv_path.stem / row[0]] = labels
 
-#     def _load_labels(self) -> None:
-#         """ラベルを読み込む共通メソッド。"""
-#         if self.split:
-#             # 訓練/検証用データセットの場合
-#             for subfolder in self.split:
-#                 self._load_labels_from_csv(os.path.join(self.dataset_root, f"{subfolder}.csv"))
-#         elif self.test_dir:
-#             # テスト用データセットの場合
-#             self._load_labels_from_csv(os.path.join(self.dataset_root, f"{self.test_dir}.csv"))
+    def _filter_labels(self, labels: list[int]) -> list[int]:
+        """
+        ラベルをフィルタリングする。
+        派生クラスで必要に応じてオーバーライドする。
+        """
+        if self.num_classes == 6:
+            # 0～5のクラスのみを使用
+            return [label for label in labels if 0 <= label <= 5]
+        elif self.num_classes == 7:
+            # 6～14のラベルを6に置き換える
+            return [6 if 6 <= label <= 14 else label for label in labels]
+        return labels
 
-#     def _load_labels_from_csv(self, csv_path: str) -> None:
-#         """CSVファイルからラベルを読み込む。"""
-#         with open(csv_path, mode="r") as file:
-#             reader = csv.reader(file)
-#             for row in reader:
-#                 labels = [int(label) for label in row[1:] if label.strip().isdigit()]
-#                 labels = self._filter_labels(labels)
-#                 labels.sort()  # ラベルを昇順にソート
-#                 self.image_dict[os.path.join(os.path.dirname(csv_path), row[0])] = labels
+    def __len__(self) -> int:
+        """データセットのサイズを返す。"""
+        return len(self.image_dict)
 
-#     def _filter_labels(self, labels: List[int]) -> List[int]:
-#         """
-#         ラベルをフィルタリングする。
-#         派生クラスで必要に応じてオーバーライドする。
-#         """
-#         if self.num_classes == 6:
-#             # 0～5のクラスのみを使用
-#             return [label for label in labels if 0 <= label <= 5]
-#         elif self.num_classes == 7:
-#             # 6～14のラベルを6に置き換える
-#             return [6 if 6 <= label <= 14 else label for label in labels]
-#         return labels
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, str, torch.Tensor]:
+        """
+        指定されたインデックスのデータを取得する。
 
-#     def __len__(self) -> int:
-#         """データセットのサイズを返す。"""
-#         return len(self.image_dict)
+        Args:
+            idx (int): データのインデックス。
 
-#     def __getitem__(self, idx: int) -> Tuple[Tensor, str, Tensor]:
-#         """
-#         指定されたインデックスのデータを取得する。
+        Returns:
+            Tuple[Tensor, str, Tensor]: (画像テンソル, 画像パス, one-hotエンコードされたラベル)
+        """
+        image_path = list(self.image_dict.keys())[idx]
+        labels = self.image_dict[image_path]
 
-#         Args:
-#             idx (int): データのインデックス。
+        # 画像を読み込む
+        image = Image.open(image_path).convert("RGB")
+        if self.transform:
+            image = self.transform(image)
 
-#         Returns:
-#             Tuple[Tensor, str, Tensor]: (画像テンソル, 画像パス, one-hotエンコードされたラベル)
-#         """
-#         img_path = list(self.image_dict.keys())[idx]
-#         labels = self.image_dict[img_path]
+        # ラベルをone-hotエンコード
+        one_hot_label = torch.zeros(self.num_classes, dtype=torch.float)
+        for label in labels:
+            one_hot_label[label] = 1
 
-#         # 画像を読み込む
-#         image = Image.open(img_path).convert("RGB")
-#         if self.transform:
-#             image = self.transform(image)
-
-#         # ラベルをone-hotエンコード
-#         one_hot_label = torch.zeros(self.num_classes, dtype=torch.float)
-#         for label in labels:
-#             one_hot_label[label] = 1
-
-#         return image, img_path, one_hot_label
+        return image, str(image_path), one_hot_label
 
 
-# class MultiLabelDetectionDataset(BaseMultiLabelDataset):
-#     """
-#     訓練/検証用のマルチラベルデータセットクラス。
-#     """
-#     def __init__(
-#         self,
-#         dataset_root: str,
-#         transform: Optional[Callable],
-#         num_classes: int,
-#         split: List[str],
-#     ) -> None:
-#         """
-#         初期化メソッド。
+class MultiLabelDetectionDataset(BaseMultiLabelDataset):
+    """
+    訓練/検証用のマルチラベルデータセットクラス。
+    """
+    def __init__(
+        self,
+        dataset_root: str,
+        data_dirs: list[str],
+        transform: transforms.Compose,
+        num_classes: int,
+    ) -> None:
+        """
+        初期化メソッド。
 
-#         Args:
-#             dataset_root (str): データセットのルートディレクトリ。
-#             transform (Callable): 画像に適用する変換関数。
-#             num_classes (int): クラス数。
-#             split (List[str]): データセットの分割名リスト。
-#         """
-#         super().__init__(dataset_root, transform, num_classes, split=split)
+        Args:
+            dataset_root (str): データセットのルートディレクトリ。
+            transform (Callable): 画像に適用する変換関数。
+            num_classes (int): クラス数。
+        """
+        super().__init__(dataset_root, transform, num_classes)
 
 
-# class MultiLabelDetectionDatasetForTest(BaseMultiLabelDataset):
-#     """
-#     テスト用のマルチラベルデータセットクラス。
-#     """
-#     def __init__(
-#         self,
-#         dataset_root: str,
-#         test_dir: str,
-#         transform: Optional[Callable],
-#         num_classes: int,
-#     ) -> None:
-#         """
-#         初期化メソッド。
+class MultiLabelDetectionDatasetForTest(BaseMultiLabelDataset):
+    """
+    テスト用のマルチラベルデータセットクラス。
+    """
+    def __init__(
+        self,
+        dataset_root: str,
+        test_dir: str,
+        transform: transforms.Compose,
+        num_classes: int,
+    ) -> None:
+        """
+        初期化メソッド。
 
-#         Args:
-#             dataset_root (str): データセットのルートディレクトリ。
-#             test_dir (str): テストデータのディレクトリ名。
-#             transform (Callable): 画像に適用する変換関数。
-#             num_classes (int): クラス数。
-#         """
-#         super().__init__(dataset_root, transform, num_classes, test_dir=test_dir)
+        Args:
+            dataset_root (str): データセットのルートディレクトリ。
+            test_dir (str): テストデータのディレクトリ名。
+            transform (Callable): 画像に適用する変換関数。
+            num_classes (int): クラス数。
+        """
+        super().__init__(dataset_root, transform, num_classes, test_dir=test_dir)

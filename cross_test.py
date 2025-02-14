@@ -11,6 +11,10 @@ from evaluate.analyzer import Analyzer
 from model.setup_models import setup_model
 from utils.torch_utils import get_device_and_num_gpus, set_seed
 from utils.logger import setup_logging
+from evaluate.results_visualizer import ResultsVisualizer
+from engine.inference import InferenceResult
+from labeling.label_converter import MultiToSingleLabelConverter
+
 
 def test(config: dict, test_data_dirs: list):
     # setup
@@ -23,7 +27,7 @@ def test(config: dict, test_data_dirs: list):
         num_classes=config.test.num_classes,
         num_gpus=num_gpus
     )
-    
+    """
     test_dataloaders = dataloader_factory.create_multilabel_test_dataloaders(test_data_dirs)
     
     # visualize
@@ -35,6 +39,20 @@ def test(config: dict, test_data_dirs: list):
     # 推論
     inference = Inference(model, device)
     results = inference.run(config.paths.save_dir, test_dataloaders)
+    """
+    
+    # 可視化
+    visualizer = ResultsVisualizer(config.paths.save_dir)
+    results = {}
+    # debug
+    for folder_name in ["20210524100043_000001-001", "20210531112330_000001-001"]:
+        results[folder_name] = visualizer.load_results(Path(config.paths.save_dir) / folder_name / f'raw_results_{folder_name}.csv')
+    
+    # filterering
+    converter = MultiToSingleLabelConverter(results)
+    hard_multilabel_results = converter.convert_soft_to_hard_multilabels(threshold=0.5)
+    
+    # visualizer.save_multilabel_visualization(hard_multilabel_results)
     
     # 出力を解析
     # analyzer = Analyzer(config.paths.save_dir, config.test.num_classes)

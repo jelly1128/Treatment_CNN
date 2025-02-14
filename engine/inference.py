@@ -12,13 +12,13 @@ class InferenceResult:
     推論結果を格納するクラス。
 
     Attributes:
+        image_paths: 画像パスのリスト
         probabilities: 予測確率のリスト
         labels: 正解ラベルのリスト
-        image_paths: 画像パスのリスト
     """
     image_paths: list[str]
-    probabilities: list[float]
-    labels: list[int]
+    probabilities: list[list[float]]
+    labels: list[list[int]]
 
 class Inference:
     def __init__(self, model: torch.nn.Module, device: str):
@@ -45,7 +45,7 @@ class Inference:
             folder_labels: 正解ラベルのリスト
             folder_image_paths: 画像パスのリスト
         """
-        results = InferenceResult([], [], [])
+        results = InferenceResult(image_paths=[], probabilities=[], labels=[])
         
         with torch.no_grad():
             for images, image_paths, labels in test_dataloader:
@@ -55,13 +55,13 @@ class Inference:
                 outputs = self.model(images)
                 sigmoid_outputs = torch.sigmoid(outputs[0])
                 
-                probabilities = sigmoid_outputs.cpu().numpy().round(4)
-                batch_labels = labels.cpu().numpy().astype(int)
+                probabilities = [round(float(prob), 4) for prob in sigmoid_outputs.tolist()]
+                labels = labels.cpu().numpy().astype(int).tolist()
                 
                 results.image_paths.extend(image_paths)
-                results.probabilities.extend(probabilities)
-                results.labels.extend(batch_labels.tolist())
-                
+                results.probabilities.append(probabilities)
+                results.labels.extend(labels)
+        
         return results
 
     def _save_results(self, save_dir: str, folder_name: str, results: InferenceResult):
@@ -79,13 +79,16 @@ class Inference:
         # 結果をCSVファイルに保存
         self._save_raw_results(save_path / f'raw_results_{folder_name}.csv', results)
         
-        self._save_visualization(save_path / f'raw_results_{folder_name}.png', results)
-        
-        
-        
     def _save_raw_results(self, csv_path: Path, results: InferenceResult):
         """
         推論結果をCSVファイルに保存する。
+        
+        Args:
+            csv_path: 保存先のパス
+            results: 推論結果
+                image_paths: 画像パスのリスト
+                probabilities: 予測確率のリスト
+                labels: 正解ラベルのリスト
         """
         with open(csv_path, mode='w', newline='') as file:
             writer = csv.writer(file)
@@ -93,11 +96,11 @@ class Inference:
                     [f"True_Class_{i}" for i in range(len(results.labels[0]))]
             writer.writerow(header)
             for img_path, probs, lbls in zip(results.image_paths, results.probabilities, results.labels):
-                writer.writerow([img_path] + probs + lbls.tolist())
+                writer.writerow([img_path] + probs + lbls)
         
         logging.info(f"Saved raw results: {csv_path}")
-
-    def run(self, save_dir, test_dataloaders):
+        
+    def run(self, save_dir: str, test_dataloaders: dict[str, DataLoader]) -> dict[str, InferenceResult]:
         """
         推論を実行し、モデルの出力を返す。
 
@@ -107,6 +110,7 @@ class Inference:
 
         Returns:
             results: フォルダごとの推論結果を格納した辞書
+            folder_results: フォルダごとの推論結果
         """
         results = {}
         

@@ -88,7 +88,8 @@ class DataLoaderFactory:
         """
         return DataLoader(
             dataset,
-            batch_size=batch_size * self.num_gpus,
+            batch_size=(1 if batch_size == 1 
+                        else batch_size * self.num_gpus),  # 条件式を直接埋め込み
             shuffle=shuffle,
             num_workers=4 * self.num_gpus
         )

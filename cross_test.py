@@ -1,65 +1,47 @@
-import os
 import argparse
+import logging
+from pathlib import Path
 
 from config.config_loader import load_test_config
-from engine.tester import Tester
+from data.data_splitter import CrossValidationSplitter
+from data.dataloader import DataLoaderFactory
+from data.dataset_visualizer import plot_dataset_samples, show_dataset_stats
+from engine.inference import Inference
+from evaluate.analyzer import Analyzer
+from model.setup_models import setup_model
 from utils.torch_utils import get_device_and_num_gpus, set_seed
 from utils.logger import setup_logging
 
-
-SPLIT1 = (
-    "20210119093456_000001-001",
-    "20210531112330_000005-001",
-    "20211223090943_000001-002",
-    "20230718-102254-ES06_20230718-102749-es06-hd",
-    "20230802-104559-ES09_20230802-105630-es09-hd",
-)
-
-SPLIT2 = (
-    "20210119093456_000001-002",
-    "20210629091641_000001-002",
-    "20211223090943_000001-003",
-    "20230801-125025-ES06_20230801-125615-es06-hd",
-    "20230803-110626-ES06_20230803-111315-es06-hd"
-)
-
-SPLIT3 = (
-    "20210119093456_000002-001",
-    "20210630102301_000001-002",
-    "20220322102354_000001-002",
-    "20230802-095553-ES09_20230802-101030-es09-hd",
-    "20230803-093923-ES09_20230803-094927-es09-hd",
-)
-
-SPLIT4 = (
-    "20210524100043_000001-001",
-    "20210531112330_000001-001",
-    "20211021093634_000001-001",
-    "20211021093634_000001-003"
-)
-
-LABELING_SPLIT = (
-    # "20230801-125025-ES06_20230801-125615-es06-hd",
-    # "20230802-095553-ES09_20230802-101030-es09-hd",
-    "20210119093456_000002-001",
-    # "20210524100043_000001-001",
-    # "20211223090943_000001-003",
-    # "20220322102354_000001-002",
-)
-
-TEST_SPLIT = SPLIT4
-
-
-def test(config):
+def test(config: dict, test_data_dirs: list):
     # setup
     device, num_gpus = get_device_and_num_gpus()
     set_seed(42)
     
-    tester = Tester(config, device, num_gpus, TEST_SPLIT)
+    dataloader_factory = DataLoaderFactory(
+        dataset_root=config.paths.dataset_root,
+        batch_size=1,
+        num_classes=config.test.num_classes,
+        num_gpus=num_gpus
+    )
     
-    tester.test()
+    test_dataloaders = dataloader_factory.create_multilabel_test_dataloaders(test_data_dirs)
     
-    os._exit(0)
+    # visualize
+    # テストデータの最初のデータを表示
+    # show_dataset_stats(test_dataloader[test_data_dirs[0]])
+    
+    model = setup_model(config, device, num_gpus, mode='test')
+    
+    # 推論
+    inference = Inference(model, device)
+    results = inference.run(config.paths.save_dir, test_dataloaders)
+    
+    # 出力を解析
+    # analyzer = Analyzer(config.paths.save_dir, config.test.num_classes)
+    # analyzer.analyze(results)
+    
+    # tester = Tester(config, device, num_gpus, test_data_dirs)
+    # tester.test()
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Multi-class organ classification model using ResNet')
@@ -71,11 +53,20 @@ def main():
     config = load_test_config(args.config)
     
     # 結果保存フォルダを作成
-    os.makedirs(config.paths.save_dir, exist_ok=True)
+    Path(config.paths.save_dir).mkdir(exist_ok=True)
     
     setup_logging(config.paths.save_dir, mode='test')
     
-    test(config)
+    # dataloaderの作成
+    splitter = CrossValidationSplitter(splits=config.splits.root)
+    split_folders = splitter.get_split_folders()
+    
+    # debug
+    # fold_idx=0のtestのデータディレクトリを取得
+    test_data_dirs = split_folders[0]['test']
+    print(test_data_dirs)
+    
+    test(config, test_data_dirs)
 
 if __name__ == '__main__':
     main()

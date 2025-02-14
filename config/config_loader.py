@@ -36,8 +36,9 @@ def load_test_config(config_path: Path) -> Config:
         
     test_config = TestConfig(**config_data['test'])
     path_config = PathConfig(**config_data['paths'])
+    split_config = SplitConfig(**config_data['splits'])
     
-    return Config(test=test_config, paths=path_config)
+    return Config(test=test_config, paths=path_config, splits=split_config)
 
 
 def main():
@@ -45,11 +46,14 @@ def main():
     train_config = load_train_config(Path('/home/tanaka/0207/config/anomaly_train_config.yaml'))
     
     # configのコンソール出力
-    print(train_config.training)
-    print(train_config.paths)
-    print(train_config.splits.root)
+    # print(train_config.training)
+    # print(train_config.paths)
+    # print(train_config.splits.root)
     
-    
+    test_config = load_test_config(Path('/home/tanaka/0218/Treatment_CNN/config/anomaly_test_config.yaml'))
+    print(test_config.test)
+    print(test_config.paths)
+    print(test_config.splits.root)
     
 if __name__ == '__main__':
     main()

@@ -9,7 +9,7 @@ import torch.optim as optim
 from config.config_loader import load_train_config
 from data.data_splitter import CrossValidationSplitter
 from data.dataloader import DataLoaderFactory
-from data.visualization import plot_dataset_samples, show_dataset_stats
+from data.dataset_visualizer import plot_dataset_samples, show_dataset_stats
 from engine.trainer import Trainer
 from engine.validator import Validator
 from model.setup_models import setup_model
@@ -23,11 +23,6 @@ def train_val(config: dict, train_data_dirs: list, val_data_dirs: list):
     device, num_gpus = get_device_and_num_gpus()
     set_seed(42)
     
-    # visualize
-    # plot_dataset_samples(config.paths.save_dir, train_data_dirs)
-    # show_dataset_stats(train_data_dirs)
-    # show_dataset_stats(val_data_dirs)
-    
     dataloader_factory = DataLoaderFactory(
         dataset_root=config.paths.dataset_root,
         batch_size=config.training.batch_size,
@@ -36,6 +31,11 @@ def train_val(config: dict, train_data_dirs: list, val_data_dirs: list):
     )
     
     train_dataloader, val_dataloader = dataloader_factory.create_multilabel_dataloaders(train_data_dirs, val_data_dirs)
+    
+    # visualize
+    # plot_dataset_samples(config.paths.save_dir, train_dataloader)
+    # show_dataset_stats(train_dataloader)
+    # show_dataset_stats(val_dataloader)
     
     model = setup_model(config, device, num_gpus, mode='train')
     

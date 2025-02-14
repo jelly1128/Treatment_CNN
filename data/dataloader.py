@@ -141,30 +141,3 @@ class DataLoaderFactory:
             )
             test_dataloaders[test_data_dir] = self.create_dataloader(test_dataset, batch_size=1, shuffle=False)
         return test_dataloaders
-
-# 使用例
-# config = ...  # 設定を読み込む
-# num_gpus = 2  # GPUの数
-
-# # configから必要な情報を抽出
-# dataset_root = config.paths.dataset_root
-# batch_size = config.training.batch_size
-# num_classes = config.training.num_classes
-
-# # ファクトリのインスタンスを作成
-# factory = DataLoaderFactory(dataset_root, batch_size, num_classes, num_gpus)
-
-# # 訓練と検証用データローダーの作成
-# train_splits = [MultiLabelDetectionDataset(dataset_root,
-#                                           transform=get_train_transforms(),
-#                                           num_classes=num_classes,
-#                                           split=split) 
-#                 for split in fold[:2]]
-# val_split = MultiLabelDetectionDataset(dataset_root,
-#                                       transform=get_test_transforms(),
-#                                       num_classes=num_classes,
-#                                       split=fold[2])
-# train_loader, val_loader = factory.create_train_val_dataloaders(train_splits, val_split)
-
-# # テスト用データローダーの作成
-# test_dataloaders = factory.create_test_dataloaders(test_splits)

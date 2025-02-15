@@ -7,6 +7,18 @@ import logging
 import csv
 from PIL import Image, ImageDraw
 from engine.inference import InferenceResult
+from labeling.label_converter import HardMultiLabelResult
+
+# 定数の定義
+LABEL_COLORS = {
+    0: (254, 195, 195),  # white
+    1: (204, 66, 38),    # lugol 
+    2: (57, 103, 177),   # indigo
+    3: (96, 165, 53),    # nbi
+    4: (86, 65, 72),     # outside
+    5: (159, 190, 183),  # bucket
+}
+DEFAULT_COLOR = (148, 148, 148)
 
 class ResultsVisualizer:
     def __init__(self, save_dir: Path):
@@ -57,44 +69,47 @@ class ResultsVisualizer:
         logging.info(f"Loaded results from {csv_path}")
         return image_paths, probabilities, labels
       
-    def save_visualization(self, save_path: Path):
+    def save_multilabel_visualization(self, results: dict[str, HardMultiLabelResult], save_path: Path = None):
         """マルチラベル分類の予測結果を時系列で可視化"""
-        label_colors = {
-            0: (254, 195, 195),  # white
-            1: (204, 66, 38),    # lugol 
-            2: (57, 103, 177),   # indigo
-            3: (96, 165, 53),    # nbi
-            4: (86, 65, 72),     # outside
-            5: (159, 190, 183),  # bucket
-        }
-        default_color = (148, 148, 148)
+        
+        for folder_name, result in results.items():
+            # マルチラベルの予測結果を取得
+            predicted_labels = np.array(result.multilabels)
+            n_images = len(predicted_labels)
+            n_classes = len(predicted_labels[0])
+            
+            # 時系列の画像を作成
+            timeline_width = n_images
+            timeline_height = n_classes * (n_images // 10)
+            
+            timeline_image = Image.new('RGB', (timeline_width, timeline_height), (255, 255, 255))
+            draw = ImageDraw.Draw(timeline_image)
+            
+            for i in range(n_images):
+                labels = predicted_labels[i]
+                for label_idx, label_value in enumerate(labels):
+                    if label_value == 1:
+                        row_idx = label_idx
+                        
+                        x1 = i * (timeline_width // n_images)
+                        x2 = (i + 1) * (timeline_width // n_images)
+                        y1 = row_idx * (n_images // 10)
+                        y2 = (row_idx + 1) * (n_images // 10)
 
-        predicted_labels = (np.array(results.probabilities) >= 0.5).astype(int)
-        n_images = len(predicted_labels)
-        n_classes = len(predicted_labels[0])
+                        color = LABEL_COLORS.get(label_idx, DEFAULT_COLOR)
+                        draw.rectangle([x1, y1, x2, y2], fill=color)
 
-        timeline_width = n_images
-        timeline_height = n_classes * (n_images // 10)
-
-        timeline_image = Image.new('RGB', (timeline_width, timeline_height), (255, 255, 255))
-        draw = ImageDraw.Draw(timeline_image)
-
-        for i in range(n_images):
-            labels = predicted_labels[i]
-            for label_idx, label_value in enumerate(labels):
-                if label_value == 1:
-                    row_idx = label_idx
-                    
-                    x1 = i * (timeline_width // n_images)
-                    x2 = (i + 1) * (timeline_width // n_images)
-                    y1 = row_idx * (n_images // 10)
-                    y2 = (row_idx + 1) * (n_images // 10)
-
-                    color = label_colors.get(label_idx, default_color)
-                    draw.rectangle([x1, y1, x2, y2], fill=color)
-
-        timeline_image.save(save_path)
-        logging.info(f'Timeline image saved at {save_path}')   
+            # 保存パスを正しく設定
+            if save_path is None:
+                save_dir = self.save_dir / folder_name
+                save_dir.mkdir(parents=True, exist_ok=True)
+                save_file = save_dir / f'{folder_name}.png'
+            else:
+                save_path.mkdir(parents=True, exist_ok=True)  # ディレクトリが存在しない場合は作成
+                save_file = save_path / f'{folder_name}.png'
+            
+            timeline_image.save(save_file)
+            logging.info(f'Timeline image saved at {save_file}')
 
     # def plot_confusion_matrices(self, predictions: np.ndarray, labels: np.ndarray, 
     #                           class_names: list = None):

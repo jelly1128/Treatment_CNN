@@ -14,8 +14,8 @@ from utils.logger import setup_logging
 from evaluate.results_visualizer import ResultsVisualizer
 from engine.inference import InferenceResult
 from labeling.label_converter import MultiToSingleLabelConverter
-
-
+from evaluate.metrics import ClassificationMetricsCalculator
+from evaluate.save_metrics import save_metrics_to_csv
 def test(config: dict, test_data_dirs: list):
     # setup
     device, num_gpus = get_device_and_num_gpus()
@@ -48,11 +48,18 @@ def test(config: dict, test_data_dirs: list):
     for folder_name in ["20210524100043_000001-001", "20210531112330_000001-001"]:
         results[folder_name] = visualizer.load_results(Path(config.paths.save_dir) / folder_name / f'raw_results_{folder_name}.csv')
     
-    # filterering
+    # コンバーター
     converter = MultiToSingleLabelConverter(results)
-    hard_multilabel_results = converter.convert_soft_to_hard_multilabels(threshold=0.5)
     
-    # visualizer.save_multilabel_visualization(hard_multilabel_results)
+    # マルチラベルを閾値でハードラベルに変換した結果
+    hard_multilabel_results = converter.convert_soft_to_hard_multilabels(threshold=0.5)
+    visualizer.save_multilabel_visualization(hard_multilabel_results)
+    
+    # 混同行列の計算
+    calculator = ClassificationMetricsCalculator()
+    video_metrics = calculator.calculate_metrics_per_video(hard_multilabel_results)
+    overall_metrics = calculator.calculate_overall_metrics(hard_multilabel_results)
+    save_metrics_to_csv(video_metrics, overall_metrics, Path(config.paths.save_dir) / 'video_metrics.csv', Path(config.paths.save_dir) / 'overall_metrics.csv')
     
     # 出力を解析
     # analyzer = Analyzer(config.paths.save_dir, config.test.num_classes)

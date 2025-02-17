@@ -4,6 +4,7 @@ class TrainingConfig(BaseModel):
     img_size: int
     num_classes: int
     model_architecture: str
+    model_type: str
     pretrained: bool
     freeze_backbone: bool
     learning_rate: float
@@ -13,6 +14,7 @@ class TrainingConfig(BaseModel):
 class TestConfig(BaseModel):
     img_size: int
     num_classes: int
+    model_type: str
 
 class PathConfig(BaseModel):
     dataset_root: str

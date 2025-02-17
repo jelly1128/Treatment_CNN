@@ -5,6 +5,8 @@ import pandas as pd
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 import logging
 from PIL import Image, ImageDraw
+from dataclasses import dataclass
+from labeling.label_converter import HardMultiLabelResult, SingleLabelResult
 
 class Analyzer:
     def __init__(self, save_dir, num_classes):
@@ -320,6 +322,49 @@ class Analyzer:
 
         timeline_image.save(os.path.join(save_dir, f"{filename}_ground_truth_timeline.png"))
         logging.info(f'Ground truth timeline image saved at {os.path.join(save_dir, f"{filename}_ground_truth_timeline.png")}')
+
+    def apply_sliding_window_to_hard_labels(self, hard_multilabel_results, window_size=5, step=1):
+        """
+        スライディングウィンドウを適用して、平滑化されたラベルを生成する関数
+
+        Args:
+            hard_multilabel_results (dict[str, HardMultiLabelResult]): 各フォルダのマルチラベルの結果
+            window_size (int): スライディングウィンドウのサイズ
+            step (int): スライディングウィンドウのステップ幅
+
+        Returns:
+            dict[str, SingleLabelResult]: 各フォルダの平滑化されたラベル
+        """
+        smoothed_results = {}
+
+        for folder_name, result in hard_multilabel_results.items():
+            y_pred = np.array(result.multilabels)[:, :6]  # 主クラスのみ
+            y_true = np.array(result.ground_truth_labels)[:, :6]  # 主クラスのみ
+            num_frames, num_classes = y_pred.shape
+
+            smoothed_labels = []
+            smoothed_ground_truth = []
+
+            for start in range(0, num_frames - window_size + 1, step):
+                window_pred = y_pred[start:start + window_size]
+                window_true = y_true[start:start + window_size]
+
+                class_counts_pred = window_pred.sum(axis=0)
+                class_counts_true = window_true.sum(axis=0)
+
+                smoothed_label = np.argmax(class_counts_pred)
+                smoothed_true_label = np.argmax(class_counts_true)
+
+                smoothed_labels.append(smoothed_label)
+                smoothed_ground_truth.append(smoothed_true_label)
+
+            smoothed_results[folder_name] = SingleLabelResult(
+                image_paths=result.image_paths[:len(smoothed_labels)],
+                single_labels=smoothed_labels,
+                ground_truth_labels=smoothed_ground_truth
+            )
+
+        return smoothed_results
 
 
 ###
@@ -809,3 +854,47 @@ def main():
     
 if __name__ == '__main__':
     main()
+
+def apply_sliding_window_to_hard_labels(hard_multilabel_results: dict[str, HardMultiLabelResult], window_size: int = 5, step: int = 1) -> dict[str, SingleLabelResult]:
+    """
+    スライディングウィンドウを適用して、平滑化されたラベルを生成する関数
+
+    Args:
+        hard_multilabel_results (dict[str, HardMultiLabelResult]): 各フォルダのマルチラベルの結果
+        window_size (int): スライディングウィンドウのサイズ
+        step (int): スライディングウィンドウのステップ幅
+
+    Returns:
+        dict[str, SingleLabelResult]: 各フォルダの平滑化されたラベル
+    """
+    smoothed_results = {}
+
+    for folder_name, result in hard_multilabel_results.items():
+        y_pred = np.array(result.multilabels)[:, :6]  # 主クラスのみ
+        y_true = np.array(result.ground_truth_labels)[:, :6]  # 主クラスのみ
+        num_frames, num_classes = y_pred.shape
+
+        smoothed_labels = []
+        smoothed_ground_truth = []
+
+        for start in range(0, num_frames - window_size + 1, step):
+            window_pred = y_pred[start:start + window_size]
+            window_true = y_true[start:start + window_size]
+
+            # 各クラスの出現回数を合計し、最も多いクラスを選択
+            class_counts_pred = window_pred.sum(axis=0)
+            class_counts_true = window_true.sum(axis=0)
+
+            smoothed_label = np.argmax(class_counts_pred)
+            smoothed_true_label = np.argmax(class_counts_true)
+
+            smoothed_labels.append(smoothed_label)
+            smoothed_ground_truth.append(smoothed_true_label)
+
+        smoothed_results[folder_name] = SingleLabelResult(
+            image_paths=result.image_paths[:len(smoothed_labels)],
+            single_labels=smoothed_labels,
+            ground_truth_labels=smoothed_ground_truth
+        )
+
+    return smoothed_results

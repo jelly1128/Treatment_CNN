@@ -7,7 +7,7 @@ import logging
 import csv
 from PIL import Image, ImageDraw
 from engine.inference import InferenceResult
-from labeling.label_converter import HardMultiLabelResult
+from labeling.label_converter import HardMultiLabelResult, SingleLabelResult
 
 # 定数の定義
 LABEL_COLORS = {
@@ -69,7 +69,7 @@ class ResultsVisualizer:
         logging.info(f"Loaded results from {csv_path}")
         return image_paths, probabilities, labels
       
-    def save_multilabel_visualization(self, results: dict[str, HardMultiLabelResult], save_path: Path = None):
+    def save_multilabel_visualization(self, results: dict[str, HardMultiLabelResult], save_path: Path = None, methods: str = 'multilabel'):
         """マルチラベル分類の予測結果を時系列で可視化"""
         
         for folder_name, result in results.items():
@@ -101,16 +101,90 @@ class ResultsVisualizer:
 
             # 保存パスを正しく設定
             if save_path is None:
+                save_dir = self.save_dir / folder_name / methods
+                save_dir.mkdir(parents=True, exist_ok=True)
+                save_file = save_dir / f'multilabel_{folder_name}.png'
+            else:
+                save_path = save_path / methods
+                save_path.mkdir(parents=True, exist_ok=True)  # ディレクトリが存在しない場合は作成
+                save_file = save_path / f'multilabel_{folder_name}.png'
+            
+            timeline_image.save(save_file)
+            logging.info(f'Timeline image saved at {save_file}')
+            
+    def save_singlelabel_visualization(self, results: dict[str, SingleLabelResult], save_path: Path = None):
+        """シングルラベル分類の予測結果を時系列で可視化"""
+        for folder_name, result in results.items():
+            # シングルラベルの予測結果を取得
+            predicted_labels = np.array(result.single_labels)
+            n_images = len(predicted_labels)
+            
+            # 時系列の画像を作成
+            timeline_width = n_images
+            timeline_height = n_images // 10
+            
+            timeline_image = Image.new('RGB', (timeline_width, timeline_height), (255, 255, 255))
+            draw = ImageDraw.Draw(timeline_image)
+            
+            for i in range(n_images):
+                label = predicted_labels[i]
+                x1 = i * (timeline_width // n_images)
+                x2 = (i + 1) * (timeline_width // n_images)
+                y1 = label * (n_images // 10)
+                y2 = (label + 1) * (n_images // 10)
+                
+                color = LABEL_COLORS.get(label, DEFAULT_COLOR)
+                draw.rectangle([x1, y1, x2, y2], fill=color)
+                
+            # 保存パスを正しく設定
+            if save_path is None:
                 save_dir = self.save_dir / folder_name
                 save_dir.mkdir(parents=True, exist_ok=True)
                 save_file = save_dir / f'{folder_name}.png'
             else:
                 save_path.mkdir(parents=True, exist_ok=True)  # ディレクトリが存在しない場合は作成
-                save_file = save_path / f'{folder_name}.png'
-            
+                save_file = save_path / f'singlelabel_{folder_name}.png'
+                
             timeline_image.save(save_file)
             logging.info(f'Timeline image saved at {save_file}')
+            
+    def save_main_classes_visualization(self, results: dict[str, HardMultiLabelResult], save_path: Path = None):
+        """正解ラベルを時系列で可視化"""
+        for folder_name, result in results.items():
+            # 主クラス（0-5）のみを抽出
+            ground_truth_labels = np.array(result.ground_truth_labels)[:, :6]  # 最初の6クラスのみを抽出
+            n_images = len(ground_truth_labels)
+            n_classes = 6  # 主クラスの数
+            
+            # 時系列の画像を作成
+            timeline_width = n_images
+            timeline_height = n_images // 10
+            
+            timeline_image = Image.new('RGB', (timeline_width, timeline_height), (255, 255, 255))
+            draw = ImageDraw.Draw(timeline_image)
+            
+            for i in range(n_images):
+                labels = ground_truth_labels[i]
+                for label_idx, label_value in enumerate(labels):
+                    if label_value == 1:
+                        x1 = i * (timeline_width // n_images)
+                        x2 = (i + 1) * (timeline_width // n_images)
 
+                        color = LABEL_COLORS.get(label_idx, DEFAULT_COLOR)
+                        draw.rectangle([x1, 0, x2, timeline_height], fill=color)
+
+            # 保存パスを正しく設定
+            if save_path is None:
+                save_dir = self.save_dir / folder_name
+                save_dir.mkdir(parents=True, exist_ok=True)
+                save_file = save_dir / f'main_classes_{folder_name}.png'
+            else:
+                save_path.mkdir(parents=True, exist_ok=True)
+                save_file = save_path / f'main_classes_{folder_name}.png'
+            
+            timeline_image.save(save_file)
+            logging.info(f'Main classes timeline image saved at {save_file}')
+            
     # def plot_confusion_matrices(self, predictions: np.ndarray, labels: np.ndarray, 
     #                           class_names: list = None):
     #     """各クラスの混同行列をプロット"""

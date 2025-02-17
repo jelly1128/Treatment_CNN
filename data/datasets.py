@@ -583,13 +583,6 @@ class BaseMultiLabelDataset(Dataset):
         """ラベルを読み込む共通メソッド。"""
         for data_dir in self.data_dirs:
             self._load_labels_from_csv(self.dataset_root / f"{data_dir}.csv")
-        # if self.data_dirs:
-        #     # 訓練/検証用データセットの場合
-        #     for data_dir in self.data_dirs:
-        #         self._load_labels_from_csv(self.dataset_root / f"{data_dir}.csv")
-        # elif self.test_dir:
-        #     # テスト用データセットの場合
-        #     self._load_labels_from_csv(self.dataset_root / f"{self.test_dir}.csv")
 
     def _load_labels_from_csv(self, csv_path: Path) -> None:
         """CSVファイルからラベルを読み込む。"""
@@ -642,48 +635,3 @@ class BaseMultiLabelDataset(Dataset):
             one_hot_label[label] = 1
 
         return image, str(image_path), one_hot_label
-
-
-class MultiLabelDetectionDataset(BaseMultiLabelDataset):
-    """
-    訓練/検証用のマルチラベルデータセットクラス。
-    """
-    def __init__(
-        self,
-        dataset_root: str,
-        data_dirs: list[str],
-        transform: transforms.Compose,
-        num_classes: int,
-    ) -> None:
-        """
-        初期化メソッド。
-
-        Args:
-            dataset_root (str): データセットのルートディレクトリ。
-            transform (Callable): 画像に適用する変換関数。
-            num_classes (int): クラス数。
-        """
-        super().__init__(dataset_root, transform, num_classes)
-
-
-class MultiLabelDetectionDatasetForTest(BaseMultiLabelDataset):
-    """
-    テスト用のマルチラベルデータセットクラス。
-    """
-    def __init__(
-        self,
-        dataset_root: str,
-        test_dir: str,
-        transform: transforms.Compose,
-        num_classes: int,
-    ) -> None:
-        """
-        初期化メソッド。
-
-        Args:
-            dataset_root (str): データセットのルートディレクトリ。
-            test_dir (str): テストデータのディレクトリ名。
-            transform (Callable): 画像に適用する変換関数。
-            num_classes (int): クラス数。
-        """
-        super().__init__(dataset_root, transform, num_classes, test_dir=test_dir)

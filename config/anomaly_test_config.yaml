@@ -1,11 +1,12 @@
 test:
   img_size: 224
   num_classes: 15
+  model_type: 'multitask'
 
 paths:
   dataset_root: '/home/tanaka/demo_data'
   save_dir: 'debug_fold1'
-  model: '/home/tanaka/0218/Treatment_CNN/debug/fold_1/best_model.pth'
+  model: '/home/tanaka/0218/Treatment_CNN/15class_resnet18/fold_1/best_model.pth'
 
 splits:
   split1:

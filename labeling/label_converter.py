@@ -8,8 +8,8 @@ class HardMultiLabelResult:
 
     Attributes:
         image_paths: 画像パスのリスト
-        multilabels: マルチラベルのリスト
-        single_labels: シングルラベルのリスト
+        multilabels: マルチラベルの予測ラベルのリスト
+        ground_truth_labels: マルチラベルの正解ラベルのリスト
     """
     image_paths: list[str]
     multilabels: list[list[int]]
@@ -19,6 +19,11 @@ class HardMultiLabelResult:
 class SingleLabelResult:
     """
     シングルラベルの結果を格納するクラス。
+    
+    Attributes:
+        image_paths: 画像パスのリスト
+        single_labels: シングルラベルの予測ラベルのリスト
+        ground_truth_labels: シングルラベルの正解ラベルのリスト
     """
     image_paths: list[str]
     single_labels: list[int]

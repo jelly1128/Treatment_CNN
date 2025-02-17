@@ -62,32 +62,52 @@ def save_video_multilabel_metrics_to_csv(video_metrics: dict[str, dict[str, floa
             for class_idx, (precision, recall, accuracy) in enumerate(zip(metrics['precision'], metrics['recall'], metrics['accuracy'])):
                 writer.writerow([class_idx, precision, recall, accuracy])
 
-def save_overall_metrics_to_csv(overall_metrics, overall_file_path):
+def save_overall_metrics_to_csv(overall_metrics, overall_file_path, methods: str):
     """
     全体のメトリクスをCSVファイルに保存する関数
 
     Args:
         overall_metrics (dict): 全体のメトリクス
         overall_file_path (str): 全体のメトリクスを保存するCSVファイルのパス
+        methods (str): 評価手法の名前
     """
-    # 混同行列を保存
-    confusion_matrix_file = Path(overall_file_path).with_name('overall_confusion_matrix.csv')
-    with open(confusion_matrix_file, mode='w', newline='') as file:
+    # フォルダを作成
+    overall_file_path = overall_file_path / methods
+    overall_file_path.mkdir(parents=True, exist_ok=True)
+    # 各クラスの混同行列を保存
+    per_class_cm_file = overall_file_path / f'{methods}_overall_per_class_confusion_matrix.csv'
+    with open(per_class_cm_file, mode='w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(["Class", "TP", "FP", "FN", "TN"])
-        for class_idx, cm in enumerate(overall_metrics['confusion_matrix']):
-            tp, fp, fn, tn = cm.ravel()
+        for class_idx, cm in enumerate(overall_metrics['per_class_confusion_matrices']):
+            tp, fp = cm[1, 1], cm[0, 1]
+            fn, tn = cm[1, 0], cm[0, 0]
             writer.writerow([class_idx, tp, fp, fn, tn])
 
+    # クラス数×クラス数の混同行列を保存
+    class_cm_file = overall_file_path / f'{methods}_overall_class_confusion_matrix.csv'
+    n_classes = len(overall_metrics['class_confusion_matrix'])
+    with open(class_cm_file, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        # ヘッダー行を書き込み
+        writer.writerow(["True/Pred"] + [f"Pred_{i}" for i in range(n_classes)])
+        # 各行のデータを書き込み
+        for i in range(n_classes):
+            row = [f"True_{i}"] + overall_metrics['class_confusion_matrix'][i].tolist()
+            writer.writerow(row)
+
     # メトリクスを保存
-    metrics_file = Path(overall_file_path).with_name('overall_metrics.csv')
+    metrics_file = overall_file_path / f'{methods}_overall_metrics.csv'
     with open(metrics_file, mode='w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(["Class", "Precision", "Recall", "Accuracy"])
-        for class_idx, (precision, recall, accuracy) in enumerate(zip(overall_metrics['precision'], overall_metrics['recall'], overall_metrics['accuracy'])):
-            writer.writerow([class_idx, precision, recall, accuracy])
-        
-        writer.writerow(["Overall", overall_metrics['overall_precision'], overall_metrics['overall_recall'], overall_metrics['overall_accuracy']])
+        writer.writerow(["Metric", "Value"])
+        writer.writerow(["Overall Precision", overall_metrics['overall_precision']])
+        writer.writerow(["Overall Recall", overall_metrics['overall_recall']])
+        writer.writerow(["Overall Accuracy", overall_metrics['overall_accuracy']])
+        writer.writerow(["Total TP", overall_metrics['total_TP']])
+        writer.writerow(["Total FP", overall_metrics['total_FP']])
+        writer.writerow(["Total TN", overall_metrics['total_TN']])
+        writer.writerow(["Total FN", overall_metrics['total_FN']])
 
 def save_video_metrics_to_csv_single(video_metrics, base_save_dir):
     """

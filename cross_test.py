@@ -66,10 +66,10 @@ def test(config: dict, test_data_dirs: list):
     ## 混同行列の計算
     calculator = ClassificationMetricsCalculator()
     video_metrics = calculator.calculate_multilabel_metrics_per_video(hard_multilabel_results)
-    # overall_metrics = calculator.calculate_multilabel_overall_metrics(hard_multilabel_results)
+    overall_metrics = calculator.calculate_multilabel_overall_metrics(hard_multilabel_results)
     # ## 各動画フォルダにマルチラベルのメトリクスを保存
     save_video_multilabel_metrics_to_csv(video_metrics, Path(config.paths.save_dir), methods = 'multilabel')
-    # save_overall_metrics_to_csv(overall_metrics, Path(config.paths.save_dir))
+    save_overall_metrics_to_csv(overall_metrics, Path(config.paths.save_dir), methods = 'multilabel')
     
     
     # ## スライディングウィンドウを適用して、平滑化されたラベルを生成

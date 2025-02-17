@@ -139,13 +139,27 @@ class ClassificationMetricsCalculator:
         y_pred = np.array(y_pred)
 
         # クラスごとの混同行列を計算
-        confusion_matrices = multilabel_confusion_matrix(y_true, y_pred)
+        per_class_confusion_matrices = multilabel_confusion_matrix(y_true, y_pred)
+        
+        # クラス数×クラス数の混同行列を計算
+        n_classes = y_true.shape[1]
+        class_confusion_matrix = np.zeros((n_classes, n_classes))
+        
+        # 各サンプルについて、予測クラスと真のクラスの組み合わせをカウント
+        for true_labels, pred_labels in zip(y_true, y_pred):
+            true_indices = np.where(true_labels == 1)[0]
+            pred_indices = np.where(pred_labels == 1)[0]
+            
+            # 真のクラスと予測クラスの組み合わせをカウント
+            for true_idx in true_indices:
+                for pred_idx in pred_indices:
+                    class_confusion_matrix[true_idx, pred_idx] += 1
         
         # 全体の混同行列を計算（全クラスの合計）
-        total_tp = np.sum([cm[1, 1] for cm in confusion_matrices])
-        total_fp = np.sum([cm[0, 1] for cm in confusion_matrices])
-        total_tn = np.sum([cm[0, 0] for cm in confusion_matrices])
-        total_fn = np.sum([cm[1, 0] for cm in confusion_matrices])
+        total_tp = np.sum([cm[1, 1] for cm in per_class_confusion_matrices])
+        total_fp = np.sum([cm[0, 1] for cm in per_class_confusion_matrices])
+        total_tn = np.sum([cm[0, 0] for cm in per_class_confusion_matrices])
+        total_fn = np.sum([cm[1, 0] for cm in per_class_confusion_matrices])
         
         # 全体の精度指標を計算
         overall_precision = total_tp / (total_tp + total_fp) if (total_tp + total_fp) > 0 else 0
@@ -159,7 +173,9 @@ class ClassificationMetricsCalculator:
             'total_TP': total_tp,
             'total_FP': total_fp,
             'total_TN': total_tn,
-            'total_FN': total_fn
+            'total_FN': total_fn,
+            'per_class_confusion_matrices': per_class_confusion_matrices,  # 各クラスの2×2混同行列
+            'class_confusion_matrix': class_confusion_matrix  # クラス数×クラス数の混同行列
         }
         # """
         # 全動画の混同行列と適合率・再現率・正解率を計算する関数

@@ -164,14 +164,15 @@ class MultiLabelDetectionModel(nn.Module):
 
         return out
 
-class MultiTaskDetectionModelConcat(nn.Module):
-    def __init__(self, num_classes=9, pretrained=False, freeze_backbone=False):
+class MultiTaskDetectionModel(nn.Module):
+    def __init__(self, num_classes=6, pretrained=False, freeze_backbone=False):
         """
         Args:
-            num_main_classes: 主クラスの数（例: 6）
-            num_unclear_classes: 不鮮明クラスの数（例: 9）
+            num_classes: 全クラス数（例: 6, 7, 15）
+            pretrained: ImageNetの重みを使用するかどうか
+            freeze_backbone: バックボーンのパラメータを固定するかどうか
         """
-        super(MultiTaskDetectionModelConcat, self).__init__()
+        super(MultiTaskDetectionModel, self).__init__()
         
         # ResNet18の初期化（pretrainedの場合はImageNetの重みを利用）
         self.resnet = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None)
@@ -184,31 +185,47 @@ class MultiTaskDetectionModelConcat(nn.Module):
             for param in self.resnet.parameters():
                 param.requires_grad = False
         
-        # 主クラス用の全結合層
-        self.main_head = nn.Linear(feature_dim, 6)
-        # 不鮮明クラス用の全結合層
-        if num_classes == 7:
+        # クラス数に応じて出力層を設定
+        if num_classes == 6:
+            # 6クラスの場合は主クラスのみ
+            self.main_head = nn.Linear(feature_dim, 6)
+            self.unclear_head = None
+        elif num_classes == 7:
+            # 7クラスの場合は主クラス6 + 不鮮明クラス1
+            self.main_head = nn.Linear(feature_dim, 6)
             self.unclear_head = nn.Linear(feature_dim, 1)
         elif num_classes == 15:
+            # 15クラスの場合は主クラス6 + 不鮮明クラス9
+            self.main_head = nn.Linear(feature_dim, 6)
             self.unclear_head = nn.Linear(feature_dim, 9)
+        else:
+            raise ValueError(f"Unsupported number of classes: {num_classes}")
+        
+        self.num_classes = num_classes
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Args:
             x: 入力テンソル (batch_size, c, h, w)
         Returns:
-            連結された出力テンソル (batch_size, num_main_classes + num_unclear_classes)
+            連結された出力テンソル
+            - 6クラスの場合: (batch_size, 6)
+            - 7クラスの場合: (batch_size, 7)
+            - 15クラスの場合: (batch_size, 15)
         """
         # バックボーンによる特徴抽出
         features = self.resnet(x)  # shape: (batch_size, feature_dim)
         
-        # それぞれのヘッドでの出力
-        main_out = self.main_head(features)       
-        unclear_out = self.unclear_head(features)   
+        # 主クラスの出力
+        main_out = self.main_head(features)
         
-        # 2つの出力を連結 (例: dim=1 で連結して最終的な出力次元が (batch_size, 15) になる)
-        output = torch.cat((main_out, unclear_out), dim=1)
-        return output
+        # クラス数に応じて出力を返す
+        if self.num_classes == 6:
+            return main_out
+        else:
+            # 不鮮明クラスの出力と連結
+            unclear_out = self.unclear_head(features)
+            return torch.cat([main_out, unclear_out], dim=1)
 
 # ======================================
 # モデルのインスタンス生成と出力例
@@ -216,7 +233,7 @@ class MultiTaskDetectionModelConcat(nn.Module):
 
 def main():
     # 例: 主クラス6、かつ不鮮明クラス9 → 合計15クラスとして出力
-    model = MultiTaskDetectionModelConcat(num_classes=15, pretrained=True, freeze_backbone=False)
+    model = MultiTaskDetectionModel(num_classes=15, pretrained=True, freeze_backbone=False)
 
     # ダミー入力例 (batch_size=4, RGB画像 224x224)
     dummy_input = torch.randn(4, 3, 224, 224)

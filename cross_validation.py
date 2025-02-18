@@ -94,6 +94,12 @@ def main():
     splitter = CrossValidationSplitter(splits=config.splits.root)
     split_folders = splitter.get_split_folders()
 
+    # debug
+    # splits = splitter.get_fold_splits()
+    # print(splits)
+    # import sys
+    # sys.exit()
+
     # --fold 引数が指定された場合は、そのfoldのみ学習
     if args.fold is not None:
         if args.fold < 0 or args.fold >= len(split_folders):

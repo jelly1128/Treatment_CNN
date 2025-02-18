@@ -9,13 +9,14 @@ import torch.optim as optim
 from config.config_loader import load_train_config
 from data.data_splitter import CrossValidationSplitter
 from data.dataloader import DataLoaderFactory
-from data.dataset_visualizer import plot_dataset_samples, show_dataset_stats
-from engine.trainer import Trainer
-from engine.validator import Validator
-from model.setup_models import setup_model
 from utils.torch_utils import get_device_and_num_gpus, set_seed
 from utils.logger import setup_logging
 from utils.training_monitor import TrainingMonitor
+from engine.trainer import Trainer
+from engine.validator import Validator
+from model.setup_models import setup_model
+from data.dataset_visualizer import plot_dataset_samples, show_dataset_stats
+
 
 
 def train_val(config: dict, train_data_dirs: list, val_data_dirs: list):
@@ -94,12 +95,13 @@ def main():
     # 各foldのtrain/val/test用フォルダ名リストを取得
     splitter = CrossValidationSplitter(splits=config.splits.root)
     split_folders = splitter.get_split_folders()
+    print(split_folders[1]['train'])
+    print(split_folders[1]['val'])
     
     # debug
     # fold_idx=0のtrainとvalのデータディレクトリを取得
-    train_data_dirs = split_folders[0]['train']
-    val_data_dirs = split_folders[0]['val']
-    
+    train_data_dirs = split_folders[1]['train']
+    val_data_dirs = split_folders[1]['val']
     train_val(config, train_data_dirs, val_data_dirs)
 
 if __name__ == '__main__':

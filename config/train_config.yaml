@@ -1,6 +1,6 @@
 training:
   img_size: 224
-  num_classes: 15
+  num_classes: 6
   model_architecture: 'resnet18'
   model_type: 'multitask'
   pretrained: True
@@ -11,7 +11,7 @@ training:
   
 paths:
   dataset_root: '/home/tanaka/demo_data'
-  save_dir: '15class_resnet18_split2'
+  save_dir: '6class_resnet18'
 
 splits:
   split1:

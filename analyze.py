@@ -806,11 +806,11 @@ def save_confusion_matrix(cm, save_path):
 def main():
     logging.basicConfig(level=logging.INFO)
     num_classes = 6
-    save_dir = f"{num_classes}class_results"
+    save_dir = f"{num_classes}class_resnet18_test"
     os.makedirs(save_dir, exist_ok=True)
     
-    # window_sizes = [1,3,5,7, 9,11,13,15,17,19, 21,23, 25,27,29,31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59, 61]
-    window_sizes = [1]
+    window_sizes = [1,3,5,7, 9,11,13,15,17,19, 21,23, 25,27,29,31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59, 61]
+    # window_sizes = [1]
     results = process_all_results(
         dataset_root=save_dir,
         num_classes=num_classes,

@@ -7,9 +7,11 @@ import logging
 from PIL import Image, ImageDraw
 from dataclasses import dataclass
 from labeling.label_converter import HardMultiLabelResult, SingleLabelResult
+from pathlib import Path
+from evaluate.save_metrics import save_video_metrics_to_csv, save_overall_metrics_to_csv
 
 class Analyzer:
-    def __init__(self, save_dir, num_classes):
+    def __init__(self, save_dir: str, num_classes: int):
         """
         推論結果を解析するクラス。
 
@@ -17,7 +19,7 @@ class Analyzer:
             save_dir (str): 結果を保存するディレクトリ
             num_classes (int): クラス数
         """
-        self.save_dir = save_dir
+        self.save_dir = Path(save_dir)
         self.num_classes = num_classes
 
     def analyze(self, results):
@@ -30,8 +32,8 @@ class Analyzer:
         for folder_name, (probabilities, labels, image_paths) in results.items():
             logging.info(f"Analyzing results for {folder_name}...")
 
-            folder_path = os.path.join(self.save_dir, folder_name)
-            os.makedirs(folder_path, exist_ok=True)
+            folder_path = self.save_dir / folder_name
+            folder_path.mkdir(exist_ok=True)
 
             self.save_raw_results(folder_path, image_paths, probabilities, labels)
             # final_results = self.postprocess_results(folder_path, image_paths, probabilities, labels)
@@ -59,7 +61,7 @@ class Analyzer:
             
     def save_raw_results(self, folder_path, image_paths, probabilities, labels):
         """生の推論結果（確率値）とラベルをCSVに保存。"""
-        csv_path = os.path.join(folder_path, 'raw_results.csv')
+        csv_path = folder_path / 'raw_results.csv'
         with open(csv_path, mode='w', newline='') as file:
             writer = csv.writer(file)
             header = ['Image_Path'] + [f"Pred_Class_{i}" for i in range(self.num_classes)] + [f"True_Class_{i}" for i in range(self.num_classes)]
@@ -87,7 +89,7 @@ class Analyzer:
 
     def save_threshold_results(self, folder_path, image_paths, pred_labels, labels):
         """閾値を適用した予測ラベルを保存。"""
-        csv_path = os.path.join(folder_path, 'threshold_results.csv')
+        csv_path = folder_path / 'threshold_results.csv'
         with open(csv_path, mode='w', newline='') as file:
             writer = csv.writer(file)
             header = ['Image_Path'] + [f"Pred_Class_{i}" for i in range(self.num_classes)] + [f"True_Class_{i}" for i in range(self.num_classes)]
@@ -98,8 +100,8 @@ class Analyzer:
 
     def calculate_metrics(self, folder_path, pred_labels, labels):
         """評価指標（精度・適合率・再現率・F1スコア）を計算しCSVに保存。"""
-        metrics_csv_path = os.path.join(folder_path, 'metrics.csv')
-        conf_matrix_csv_path = os.path.join(folder_path, 'confusion_matrix.csv')
+        metrics_csv_path = folder_path / 'metrics.csv'
+        conf_matrix_csv_path = folder_path / 'confusion_matrix.csv'
 
         with open(metrics_csv_path, mode='w', newline='') as metrics_file, open(conf_matrix_csv_path, mode='w', newline='') as conf_matrix_file:
             metrics_writer = csv.writer(metrics_file)
@@ -278,8 +280,8 @@ class Analyzer:
                     color = label_colors.get(label_idx, default_color)
                     draw.rectangle([x1, y1, x2, y2], fill=color)
 
-        timeline_image.save(os.path.join(save_dir, f"{filename}_predicted_timeline.png"))
-        logging.info(f'Timeline image saved at {os.path.join(save_dir, "multilabel_timeline.png")}')
+        timeline_image.save(save_dir / f"{filename}_predicted_timeline.png")
+        logging.info(f'Timeline image saved at {save_dir / "multilabel_timeline.png"}')
 
 
     def visualize_ground_truth_timeline(self, df, save_dir, filename):
@@ -320,12 +322,12 @@ class Analyzer:
                     color = label_colors.get(label_idx, default_color)
                     draw.rectangle([x1, y1, x2, y2], fill=color)
 
-        timeline_image.save(os.path.join(save_dir, f"{filename}_ground_truth_timeline.png"))
-        logging.info(f'Ground truth timeline image saved at {os.path.join(save_dir, f"{filename}_ground_truth_timeline.png")}')
+        timeline_image.save(save_dir / f"{filename}_ground_truth_timeline.png")
+        logging.info(f'Ground truth timeline image saved at {save_dir / f"{filename}_ground_truth_timeline.png"}')
 
-    def apply_sliding_window_to_hard_labels(self, hard_multilabel_results, window_size=5, step=1):
+    def apply_sliding_window_to_hard_multilabel_results(self, hard_multilabel_results: dict[str, HardMultiLabelResult], window_size=5, step=1):
         """
-        スライディングウィンドウを適用して、平滑化されたラベルを生成する関数
+        マルチラベルの予測結果にスライディングウィンドウを適用して、主クラス（0-5）のシングルラベル予測に変換する関数
 
         Args:
             hard_multilabel_results (dict[str, HardMultiLabelResult]): 各フォルダのマルチラベルの結果
@@ -333,38 +335,157 @@ class Analyzer:
             step (int): スライディングウィンドウのステップ幅
 
         Returns:
-            dict[str, SingleLabelResult]: 各フォルダの平滑化されたラベル
+            dict[str, SingleLabelResult]: 各フォルダの主クラスのシングルラベル予測結果
         """
         smoothed_results = {}
 
         for folder_name, result in hard_multilabel_results.items():
             y_pred = np.array(result.multilabels)[:, :6]  # 主クラスのみ
             y_true = np.array(result.ground_truth_labels)[:, :6]  # 主クラスのみ
-            num_frames, num_classes = y_pred.shape
+            num_frames = len(y_pred)
 
+            # 予測ラベルにのみスライディングウィンドウを適用
             smoothed_labels = []
-            smoothed_ground_truth = []
-
             for start in range(0, num_frames - window_size + 1, step):
                 window_pred = y_pred[start:start + window_size]
-                window_true = y_true[start:start + window_size]
-
                 class_counts_pred = window_pred.sum(axis=0)
-                class_counts_true = window_true.sum(axis=0)
-
                 smoothed_label = np.argmax(class_counts_pred)
-                smoothed_true_label = np.argmax(class_counts_true)
-
                 smoothed_labels.append(smoothed_label)
-                smoothed_ground_truth.append(smoothed_true_label)
+
+            # 正解ラベルは主クラスの中で1が立っているインデックスを取得
+            true_labels = [np.argmax(label) for label in y_true[:len(smoothed_labels)]]
 
             smoothed_results[folder_name] = SingleLabelResult(
                 image_paths=result.image_paths[:len(smoothed_labels)],
                 single_labels=smoothed_labels,
-                ground_truth_labels=smoothed_ground_truth
+                ground_truth_labels=true_labels
             )
 
         return smoothed_results
+
+    def analyze_sliding_windows(self, hard_multilabel_results, visualizer, calculator, window_sizes=None):
+        """
+        異なるウィンドウサイズでスライディングウィンドウ解析を実行し、結果をまとめる
+
+        Args:
+            hard_multilabel_results: マルチラベルの予測結果
+            visualizer: 可視化用のインスタンス
+            calculator: メトリクス計算用のインスタンス
+            window_sizes: ウィンドウサイズのリスト（Noneの場合はデフォルト値を使用）
+
+        Returns:
+            dict: 各ウィンドウサイズの結果
+            dict: 各ウィンドウサイズのメトリクス
+        """
+        if window_sizes is None:
+            window_sizes = range(3, 16, 2)  # 3, 5, 7, 9, 11, 13, 15
+        
+        all_window_results = {}
+        all_window_metrics = {}
+        
+        for window_size in window_sizes:
+            # スライディングウィンドウを適用
+            sliding_window_results = self.apply_sliding_window_to_hard_multilabel_results(
+                hard_multilabel_results, 
+                window_size=window_size
+            )
+            
+            # 結果を可視化
+            visualizer.save_singlelabel_visualization(
+                sliding_window_results, 
+                methods=f'sliding_window_{window_size}'
+            )
+            
+            # メトリクスを計算
+            video_metrics = calculator.calculate_singlelabel_metrics_per_video(sliding_window_results)
+            overall_metrics = calculator.calculate_singlelabel_overall_metrics(sliding_window_results)
+            
+            # 各動画フォルダにメトリクスを保存
+            save_video_metrics_to_csv(
+                video_metrics, 
+                self.save_dir, 
+                methods=f'sliding_window_{window_size}'
+            )
+            
+            # 全体のメトリクスを保存
+            save_overall_metrics_to_csv(
+                overall_metrics, 
+                self.save_dir, 
+                methods=f'sliding_window_{window_size}'
+            )
+            
+            # 結果を辞書に保存
+            all_window_results[window_size] = sliding_window_results
+            all_window_metrics[window_size] = overall_metrics
+        
+        # サマリーファイルを作成
+        # self.save_sliding_window_summary(all_window_metrics)
+        
+        return all_window_results, all_window_metrics
+
+    def save_sliding_window_summary(self, all_window_metrics):
+        """
+        全ウィンドウサイズの結果をまとめたCSVを作成する
+
+        Args:
+            all_window_metrics: 各ウィンドウサイズのメトリクス
+        """
+        summary_file = self.save_dir / 'sliding_window_summary.csv'
+        with open(summary_file, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            # ヘッダー行
+            header = ['Window Size']
+            metrics_names = ['Precision', 'Recall', 'Accuracy']
+            for class_idx in range(self.num_classes):
+                for metric_name in metrics_names:
+                    header.append(f'Class_{class_idx}_{metric_name}')
+            writer.writerow(header)
+            
+            # 各ウィンドウサイズの結果
+            for window_size, metrics in all_window_metrics.items():
+                row = [window_size]
+                # 各クラスのメトリクスを追加
+                for class_metrics in metrics['class_metrics']:
+                    row.extend([
+                        class_metrics['precision'],
+                        class_metrics['recall'],
+                        class_metrics['accuracy']
+                    ])
+                writer.writerow(row)
+        
+        logging.info(f'Sliding window summary saved to {summary_file}')
+
+    def evaluate_with_varying_window_sizes(self, single_label_results, save_dir):
+        """
+        ウィンドウサイズを3から61まで変化させながら、各ウィンドウサイズでの各クラスの適合率と再現率を計算し、CSVに保存します。
+
+        Args:
+            single_label_results (dict): フォールドごとの結果を格納した辞書
+            save_dir (Path): 結果を保存するディレクトリ
+        """
+        results = []
+
+        for window_size in range(3, 62, 2):  # 3から61までの奇数
+            # スライディングウィンドウを適用
+            sliding_window_results = self.apply_sliding_window_to_hard_labels(single_label_results, window_size=window_size)
+
+            # メトリクスを計算
+            metrics_results = self.calculate_all_folds_metrics(sliding_window_results, save_dir)
+
+            # 各クラスの適合率と再現率を取得
+            for class_idx, metrics in enumerate(metrics_results['class_metrics']):
+                results.append({
+                    'Window Size': window_size,
+                    'Class': class_idx,
+                    'Precision': metrics['precision'],
+                    'Recall': metrics['recall']
+                })
+
+        # 結果をDataFrameに変換
+        results_df = pd.DataFrame(results)
+
+        # CSVに保存
+        results_df.to_csv(save_dir / 'window_size_metrics.csv', index=False)
 
 
 ###
@@ -487,8 +608,8 @@ def visualize_timeline(labels, save_dir, filename, n_class):
                 
     # Save the image
     os.makedirs(save_dir, exist_ok=True)
-    timeline_image.save(os.path.join(save_dir, f'{filename}.png'))
-    print(f'Timeline image saved at {os.path.join(save_dir, f"{filename}.png")}')
+    timeline_image.save(save_dir / f'{filename}.png')
+    print(f'Timeline image saved at {save_dir / f"{filename}.png"}')
     
     
 def process_all_results(dataset_root, num_classes, window_size=5, step=1, methods=None):
@@ -872,7 +993,7 @@ def apply_sliding_window_to_hard_labels(hard_multilabel_results: dict[str, HardM
     for folder_name, result in hard_multilabel_results.items():
         y_pred = np.array(result.multilabels)[:, :6]  # 主クラスのみ
         y_true = np.array(result.ground_truth_labels)[:, :6]  # 主クラスのみ
-        num_frames, num_classes = y_pred.shape
+        num_frames = len(y_pred)
 
         smoothed_labels = []
         smoothed_ground_truth = []

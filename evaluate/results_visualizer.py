@@ -103,16 +103,16 @@ class ResultsVisualizer:
             if save_path is None:
                 save_dir = self.save_dir / folder_name / methods
                 save_dir.mkdir(parents=True, exist_ok=True)
-                save_file = save_dir / f'multilabel_{folder_name}.png'
+                save_file = save_dir / f'{methods}_{folder_name}.png'
             else:
-                save_path = save_path / methods
+                save_path = save_path / folder_name / methods
                 save_path.mkdir(parents=True, exist_ok=True)  # ディレクトリが存在しない場合は作成
-                save_file = save_path / f'multilabel_{folder_name}.png'
+                save_file = save_path / f'{methods}_{folder_name}.png'
             
             timeline_image.save(save_file)
             logging.info(f'Timeline image saved at {save_file}')
             
-    def save_singlelabel_visualization(self, results: dict[str, SingleLabelResult], save_path: Path = None):
+    def save_singlelabel_visualization(self, results: dict[str, SingleLabelResult], save_path: Path = None, methods: str = 'singlelabel'):
         """シングルラベル分類の予測結果を時系列で可視化"""
         for folder_name, result in results.items():
             # シングルラベルの予測結果を取得
@@ -130,20 +130,18 @@ class ResultsVisualizer:
                 label = predicted_labels[i]
                 x1 = i * (timeline_width // n_images)
                 x2 = (i + 1) * (timeline_width // n_images)
-                y1 = label * (n_images // 10)
-                y2 = (label + 1) * (n_images // 10)
                 
                 color = LABEL_COLORS.get(label, DEFAULT_COLOR)
-                draw.rectangle([x1, y1, x2, y2], fill=color)
+                draw.rectangle([x1, 0, x2, timeline_height], fill=color)
                 
             # 保存パスを正しく設定
             if save_path is None:
-                save_dir = self.save_dir / folder_name
+                save_dir = self.save_dir / folder_name / methods
                 save_dir.mkdir(parents=True, exist_ok=True)
-                save_file = save_dir / f'{folder_name}.png'
+                save_file = save_dir / f'{methods}_{folder_name}.png'
             else:
                 save_path.mkdir(parents=True, exist_ok=True)  # ディレクトリが存在しない場合は作成
-                save_file = save_path / f'singlelabel_{folder_name}.png'
+                save_file = save_path / f'{methods}_{folder_name}.png'
                 
             timeline_image.save(save_file)
             logging.info(f'Timeline image saved at {save_file}')

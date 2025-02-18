@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from .cnn_models import MultiLabelDetectionModel, MultiTaskDetectionModel
+from .cnn_models import MultiLabelDetectionModel, MultiTaskDetectionModel, AnomalyDetectionModel
 def setup_model(config, device, num_gpus, mode='train'):
     """
     モデルをセットアップし、GPUに移動し、並列化する。
@@ -25,6 +25,12 @@ def setup_model(config, device, num_gpus, mode='train'):
     )
     elif model_type == 'multitask':
         model = MultiTaskDetectionModel(
+            num_classes=config.training.num_classes if mode == 'train' else config.test.num_classes,  # テスト時はnum_classes=config.testing.num_classes
+            pretrained=config.training.pretrained if mode == 'train' else False,  # テスト時はpretrained=False
+            freeze_backbone=config.training.freeze_backbone if mode == 'train' else False  # テスト時はfreeze_backbone=False
+        )
+    elif model_type == 'classification':
+        model = AnomalyDetectionModel(
             num_classes=config.training.num_classes if mode == 'train' else config.test.num_classes,  # テスト時はnum_classes=config.testing.num_classes
             pretrained=config.training.pretrained if mode == 'train' else False,  # テスト時はpretrained=False
             freeze_backbone=config.training.freeze_backbone if mode == 'train' else False  # テスト時はfreeze_backbone=False

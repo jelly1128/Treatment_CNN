@@ -19,7 +19,7 @@ class TestConfig(BaseModel):
 class PathConfig(BaseModel):
     dataset_root: str
     save_dir: str
-    model: str | None = None
+    model_paths: list[str] | None = None
     
 class SplitConfig(RootModel[dict[str, list[str]]]):
     pass

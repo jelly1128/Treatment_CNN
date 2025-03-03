@@ -44,18 +44,12 @@ def test(config: dict, test_data_dirs: list, model_path: str, save_dir: str, win
     )
     test_dataloaders = dataloader_factory.create_multilabel_test_dataloaders(test_data_dirs)
     
-    # visualize
-    # テストデータの最初のデータを表示
-    # show_dataset_stats(test_dataloader[test_data_dirs[0]])
-    
     model = setup_model(config, device, num_gpus, mode='test', model_path=model_path)
     
     # 推論
     inference = Inference(model, device)
     results = inference.run(save_dir, test_dataloaders)
     
-    import sys
-    sys.exit()
     
     # 可視化
     visualizer = ResultsVisualizer(save_dir)
@@ -63,7 +57,6 @@ def test(config: dict, test_data_dirs: list, model_path: str, save_dir: str, win
     # # debug
     # for folder_name in test_data_dirs:
     #     results[folder_name] = visualizer.load_results(Path(save_dir) / folder_name / f'raw_results_{folder_name}.csv')
-    
     
     # コンバーター
     converter = MultiToSingleLabelConverter(results)
@@ -76,6 +69,10 @@ def test(config: dict, test_data_dirs: list, model_path: str, save_dir: str, win
     converter.save_hard_multilabel_results(hard_multilabel_results, Path(save_dir), methods = 'threshold_50%')
     # 正解ラベルの可視化
     visualizer.save_main_classes_visualization(hard_multilabel_results)
+
+    
+    import sys
+    sys.exit()
     
     ## マルチラベルを閾値でハードラベルに変換した結果を可視化
     visualizer.save_multilabel_visualization(hard_multilabel_results, methods = 'threshold_50%')
@@ -185,10 +182,12 @@ def main():
 
             print(f"Started test for fold {fold_idx}")
 
-            sliding_window_results = test(config, 
-                                          split_data['test'], 
-                                          model_path,
-                                          window_size)
+            sliding_window_results = test(config=config, 
+                                          test_data_dirs=split_data['test'], 
+                                          model_path=model_path,
+                                          save_dir=fold_save_dir,
+                                          window_size=window_size
+                                          )
             
             # 各foldの結果を全体の辞書に追加
             for folder_name, result in sliding_window_results.items():

@@ -1,7 +1,7 @@
 import csv
 from pathlib import Path
 from labeling.label_converter import HardMultiLabelResult
-from cross_validation import CrossValidationSplitter
+from data.data_splitter import CrossValidationSplitter
 
 
 def load_hard_multilabel_results(csv_path: Path) -> HardMultiLabelResult:

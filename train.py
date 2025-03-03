@@ -17,9 +17,7 @@ from engine.validator import Validator
 from model.setup_models import setup_model
 
 
-def train_val(config: dict, train_data_dirs: list, val_data_dirs: list, fold_idx: int):
-    logging.info(f"Starting training for fold {fold_idx+1}...")
-
+def train_val(config: dict, train_data_dirs: list, val_data_dirs: list, save_dir: str, logger: logging.Logger):
     # setup
     device, num_gpus = get_device_and_num_gpus()
     set_seed(42)
@@ -42,7 +40,7 @@ def train_val(config: dict, train_data_dirs: list, val_data_dirs: list, fold_idx
 
     # 学習の経過を保存
     loss_history = {'train': [], 'val': []}
-    monitor = TrainingMonitor(Path(config.paths.save_dir) / f"fold_{fold_idx+1}")
+    monitor = TrainingMonitor(save_dir)
 
     # 学習・検証エンジン
     trainer = Trainer(model, optimizer, criterion, device)
@@ -57,15 +55,15 @@ def train_val(config: dict, train_data_dirs: list, val_data_dirs: list, fold_idx
         loss_history['val'].append(val_loss)
 
         # ログ出力
-        logging.info(
-            f"- Epoch {epoch+1} Training Loss: {train_loss:.4f}, Validation Loss: {val_loss:.4f}\n"
-        )
+        log_message = "epoch %d: training_loss: %.4f validation_loss: %.4f" % (
+                       epoch+1,  train_loss,         val_loss)
+        
+        logger.info(log_message)
 
         # モデル保存
         if val_loss <= min(loss_history['val']):
-            model_path = Path(config.paths.save_dir) / f"fold_{fold_idx+1}" / "best_model.pth"
-            torch.save(model.state_dict(), model_path)
-            logging.info(f"Best model for fold {fold_idx+1} saved.")
+            torch.save(model.state_dict(), Path(save_dir, "best_model.pth"))
+            logger.info("Best model saved.")
 
     # 学習曲線の可視化
     monitor.plot_learning_curve(loss_history)
@@ -76,6 +74,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', type=str, help='Path to config file', default='config.yaml')
     parser.add_argument('-f', '--fold', type=int, help='Fold number to train (optional, if not set, trains all folds)')
+    parser.add_argument('-a', '--class_num', type=int, help='Number of classes to train (optional, if not set, uses the number of classes in the config file)')
     return parser.parse_args()
 
 
@@ -86,9 +85,6 @@ def main():
 
     # 結果保存フォルダを作成
     Path(config.paths.save_dir).mkdir(exist_ok=True)
-
-    # ログ設定
-    setup_logging(config.paths.save_dir, mode='training')
 
     # 交差検証のためのデータ分割
     splitter = CrossValidationSplitter(splits=config.splits.root)
@@ -111,10 +107,31 @@ def main():
     
     # すべてのfoldを学習
     else:
-        for fold_idx, fold in enumerate(split_folders):
-            train_data_dirs = fold['train']
-            val_data_dirs = fold['val']
-            train_val(config, train_data_dirs, val_data_dirs, fold_idx)
+        # 各foldごとに学習を実行
+        for fold_idx, split_data in enumerate(split_folders):
+            # fold_idx = fold_idx + 1
+            # fold用の結果保存フォルダを作成
+            fold_save_dir = Path(config.paths.save_dir) / f"fold_{fold_idx}"
+            fold_save_dir.mkdir(parents=True, exist_ok=True)
+            
+            # 各foldで独立したロガーを設定
+            logger = setup_logging(fold_save_dir, f'training_fold_{fold_idx}')
+            logger.info(f"Started training for fold {fold_idx}")
+            
+            try:
+                # train_val関数にloggerを渡す
+                train_val(
+                    config=config,
+                    train_data_dirs=split_data['train'],
+                    val_data_dirs=split_data['val'],
+                    save_dir=fold_save_dir,
+                    logger=logger
+                )
+                logger.info(f"Completed training for fold {fold_idx}")
+                
+            except Exception as e:
+                logger.error(f"Error in fold {fold_idx}: {str(e)}")
+                continue
 
 
 if __name__ == '__main__':

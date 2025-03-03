@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from .cnn_models import MultiLabelDetectionModel, MultiTaskDetectionModel, AnomalyDetectionModel
-def setup_model(config, device, num_gpus, mode='train'):
+def setup_model(config, device, num_gpus, mode='train', model_path=None):
     """
     モデルをセットアップし、GPUに移動し、並列化する。
 
@@ -20,31 +20,25 @@ def setup_model(config, device, num_gpus, mode='train'):
     if model_type  == 'multilabel':
         model = MultiLabelDetectionModel(
             num_classes=config.training.num_classes if mode == 'train' else config.test.num_classes,  # テスト時はnum_classes=config.testing.num_classes
-        pretrained=config.training.pretrained if mode == 'train' else False,  # テスト時はpretrained=False
-        freeze_backbone=config.training.freeze_backbone if mode == 'train' else False  # テスト時はfreeze_backbone=False
+        pretrained=config.training.pretrained if mode == 'train' else False,                          # テスト時はpretrained=False
+        freeze_backbone=config.training.freeze_backbone if mode == 'train' else False                 # テスト時はfreeze_backbone=False
     )
     elif model_type == 'multitask':
         model = MultiTaskDetectionModel(
             num_classes=config.training.num_classes if mode == 'train' else config.test.num_classes,  # テスト時はnum_classes=config.testing.num_classes
-            pretrained=config.training.pretrained if mode == 'train' else False,  # テスト時はpretrained=False
-            freeze_backbone=config.training.freeze_backbone if mode == 'train' else False  # テスト時はfreeze_backbone=False
-        )
-    elif model_type == 'classification':
-        model = AnomalyDetectionModel(
-            num_classes=config.training.num_classes if mode == 'train' else config.test.num_classes,  # テスト時はnum_classes=config.testing.num_classes
-            pretrained=config.training.pretrained if mode == 'train' else False,  # テスト時はpretrained=False
-            freeze_backbone=config.training.freeze_backbone if mode == 'train' else False  # テスト時はfreeze_backbone=False
+            pretrained=config.training.pretrained if mode == 'train' else False,                      # テスト時はpretrained=False
+            freeze_backbone=config.training.freeze_backbone if mode == 'train' else False             # テスト時はfreeze_backbone=False
         )
     else:
         raise ValueError(f"Invalid model type: {config.training.model_type}")
 
     # テスト時は学習済みの重みを読み込む
     if mode == 'test':
-        if config.paths.model is None:
+        if model_path is None:
             raise ValueError("model_path must be provided in test mode.")
         
         # モデルの重みを読み込む
-        state_dict = torch.load(config.paths.model)
+        state_dict = torch.load(model_path)
         
         # DataParallelで保存されたモデルの重みを処理
         if 'module.' in list(state_dict.keys())[0]:

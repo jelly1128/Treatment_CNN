@@ -9,44 +9,41 @@ def jst_time(*args):
 logging.Formatter.converter = jst_time
 
 
-def setup_logging(save_dir: str, mode='training') -> logging.Logger:
+def setup_logging(log_dir: Path, mode: str) -> logging.Logger:
     """
-    ログの設定を実施。
+    ロギングの設定を行う関数
     
-    引数:
-        save_dir (str): ログを保存するディレクトリのパス
-        mode (str, optional): ログの種類を指定します。デフォルトは 'training'
-        
-    戻り値:
-        logger (logging.Logger): ログ
+    Args:
+        log_dir (Path): ログファイルを保存するディレクトリ
+        mode (str): ロギングモード（例：'training_fold_0'）
+    
+    Returns:
+        logging.Logger: 設定済みのロガーオブジェクト
     """
-    # ログを保存するディレクトリ
-    save_dir = Path(save_dir)
-    
-    if not save_dir.exists():
-        raise FileNotFoundError(f"ログの保存ディレクトリ '{save_dir}' が存在しません．")
-    
-    logger = logging.getLogger(mode)
+    # ロガーの取得
+    logger = logging.getLogger(mode)  # モードごとに異なるロガーを作成
     logger.setLevel(logging.INFO)
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
-        
-    # ログフォーマット
-    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     
-    # ファイル出力のハンドラー
-    file_handler = logging.FileHandler(save_dir / f'{mode}.log', encoding="utf-8")
+    # 既存のハンドラをクリア
+    if logger.hasHandlers():
+        logger.handlers.clear()
+    
+    # フォーマッタの作成
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    
+    # ファイルハンドラの設定
+    log_file = log_dir / f"{mode}.log"
+    file_handler = logging.FileHandler(str(log_file))
+    file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
-
-    # コンソール出力のハンドラー
-    stream_handler = logging.StreamHandler()
-    stream_handler.setFormatter(formatter)
-
-    # ロガーにハンドラーを追加
     logger.addHandler(file_handler)
-    logger.addHandler(stream_handler)
     
-    # `basicConfig` を設定
-    logging.basicConfig(level=logging.INFO, handlers=[file_handler, stream_handler])
-
-    logging.info(f"Logging initialized. Logs will be saved in {save_dir / f'{mode}.log'}")
+    # コンソールハンドラの設定
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    
+    logger.info(f"Logging initialized. Logs will be saved in {log_file}")
+    
+    return logger

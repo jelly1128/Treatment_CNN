@@ -152,7 +152,6 @@ class ResultsVisualizer:
             # 主クラス（0-5）のみを抽出
             ground_truth_labels = np.array(result.ground_truth_labels)[:, :6]  # 最初の6クラスのみを抽出
             n_images = len(ground_truth_labels)
-            n_classes = 6  # 主クラスの数
             
             # 時系列の画像を作成
             timeline_width = n_images

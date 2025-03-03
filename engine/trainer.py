@@ -16,12 +16,18 @@ class Trainer:
             self.optimizer.zero_grad()
             outputs = self.model(images)
             
-            # multitaskモデルの場合のみ記述
-            main_outputs, unclear_outputs = outputs[:, :6], outputs[:, 6:]
-            main_labels, unclear_labels = labels[:, :6], labels[:, 6:] 
-            main_loss = self.criterion(main_outputs, main_labels)
-            unclear_loss = self.criterion(unclear_outputs, unclear_labels)
-            loss = main_loss + unclear_loss
+            # モデルの出力次元数を確認
+            if outputs.shape[1] > 6:  # マルチタスクモデルの場合
+                main_outputs, unclear_outputs = outputs[:, :6], outputs[:, 6:]
+                main_labels, unclear_labels = labels[:, :6], labels[:, 6:] 
+                main_loss = self.criterion(main_outputs, main_labels)
+                unclear_loss = self.criterion(unclear_outputs, unclear_labels)
+                loss = main_loss + unclear_loss
+
+            else:  # 6クラスのみの場合
+                loss = self.criterion(outputs, labels)
+
+            # print(f'loss: {loss.item()}')
             
             total_loss += loss.item()
             loss.backward()

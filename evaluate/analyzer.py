@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from labeling.label_converter import HardMultiLabelResult, SingleLabelResult
 from pathlib import Path
 from evaluate.save_metrics import save_video_metrics_to_csv, save_overall_metrics_to_csv
+from evaluate.metrics import ClassificationMetricsCalculator
+from evaluate.results_visualizer import ResultsVisualizer
 
 class Analyzer:
     def __init__(self, save_dir: str, num_classes: int):
@@ -363,7 +365,12 @@ class Analyzer:
 
         return smoothed_results
 
-    def analyze_sliding_windows(self, hard_multilabel_results, visualizer, calculator, window_sizes=None):
+    def analyze_sliding_windows(self,
+                                save_dir: Path,
+                                hard_multilabel_results: dict[str, HardMultiLabelResult], 
+                                visualizer: ResultsVisualizer, 
+                                calculator: ClassificationMetricsCalculator, 
+                                window_sizes: list=None):
         """
         異なるウィンドウサイズでスライディングウィンドウ解析を実行し、結果をまとめる
 
@@ -381,7 +388,6 @@ class Analyzer:
             window_sizes = range(3, 16, 2)  # 3, 5, 7, 9, 11, 13, 15
         
         all_window_results = {}
-        all_window_metrics = {}
         
         for window_size in window_sizes:
             # スライディングウィンドウを適用
@@ -389,10 +395,24 @@ class Analyzer:
                 hard_multilabel_results, 
                 window_size=window_size
             )
+
+            # 結果を保存
+            for folder_name, result in sliding_window_results.items():
+                save_path = Path(self.save_dir) / folder_name / f'sliding_window_{window_size}'
+                save_path.mkdir(parents=True, exist_ok=True)
+
+                with open(save_path / f'sliding_window_{window_size}_results_{folder_name}.csv', mode='w', newline='') as file:
+                    writer = csv.writer(file)
+                    header = ['Image_Path'] + [f"Pred_Class"] + [f"True_Class"]
+                    writer.writerow(header)
+                    # 1行ずつ書き込み
+                    for image_path, pred_label, true_label in zip(result.image_paths, result.single_labels, result.ground_truth_labels):
+                        writer.writerow([image_path, pred_label, true_label])
             
             # 結果を可視化
             visualizer.save_singlelabel_visualization(
-                sliding_window_results, 
+                sliding_window_results,
+                Path(self.save_dir),
                 methods=f'sliding_window_{window_size}'
             )
             
@@ -403,25 +423,24 @@ class Analyzer:
             # 各動画フォルダにメトリクスを保存
             save_video_metrics_to_csv(
                 video_metrics, 
-                self.save_dir, 
+                Path(self.save_dir),
                 methods=f'sliding_window_{window_size}'
             )
             
             # 全体のメトリクスを保存
             save_overall_metrics_to_csv(
                 overall_metrics, 
-                self.save_dir, 
+                Path(self.save_dir) / 'fold_results',
                 methods=f'sliding_window_{window_size}'
             )
             
             # 結果を辞書に保存
-            all_window_results[window_size] = sliding_window_results
-            all_window_metrics[window_size] = overall_metrics
+            all_window_results[f'window_size_{window_size}'] = sliding_window_results
         
         # サマリーファイルを作成
         # self.save_sliding_window_summary(all_window_metrics)
         
-        return all_window_results, all_window_metrics
+        return all_window_results
 
     def save_sliding_window_summary(self, all_window_metrics):
         """

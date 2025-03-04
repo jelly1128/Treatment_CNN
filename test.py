@@ -17,12 +17,11 @@ from evaluate.results_visualizer import ResultsVisualizer
 from engine.inference import InferenceResult
 from labeling.label_converter import MultiToSingleLabelConverter
 from evaluate.metrics import ClassificationMetricsCalculator
-# from evaluate.save_metrics import MetricsSaver
 from evaluate.save_metrics import save_video_metrics_to_csv, save_overall_metrics_to_csv
 from analyze_0218 import load_hard_multilabel_results
 
 
-def test(config: dict, test_data_dirs: list, model_path: str, save_dir: str, window_size: int):
+def test(config: dict, test_data_dirs: list, model_path: str, save_dir: str, window_sizes: list):
     """
     テストデータを用いてモデルの評価を行う関数
     Args:
@@ -50,105 +49,50 @@ def test(config: dict, test_data_dirs: list, model_path: str, save_dir: str, win
     inference = Inference(model, device)
     results = inference.run(save_dir, test_dataloaders)
     
-    
     # 可視化
     visualizer = ResultsVisualizer(save_dir)
-    # results = {}
-    # # debug
-    # for folder_name in test_data_dirs:
-    #     results[folder_name] = visualizer.load_results(Path(save_dir) / folder_name / f'raw_results_{folder_name}.csv')
-    
     # コンバーター
     converter = MultiToSingleLabelConverter(results)
-    # メトリクス保存
-    # metrics_saver = MetricsSaver(Path(save_dir))
     
     # マルチラベルを閾値でハードラベルに変換する手法の結果
     ## マルチラベルを閾値でハードラベルに変換
     hard_multilabel_results = converter.convert_soft_to_hard_multilabels(threshold=0.5)
     converter.save_hard_multilabel_results(hard_multilabel_results, Path(save_dir), methods = 'threshold_50%')
+
     # 正解ラベルの可視化
     visualizer.save_main_classes_visualization(hard_multilabel_results)
+    # マルチラベルを閾値でハードラベルに変換した結果を可視化
+    visualizer.save_multilabel_visualization(hard_multilabel_results, Path(save_dir), methods = 'threshold_50%')
 
-    
-    import sys
-    sys.exit()
-    
-    ## マルチラベルを閾値でハードラベルに変換した結果を可視化
-    visualizer.save_multilabel_visualization(hard_multilabel_results, methods = 'threshold_50%')
+
     ## 混同行列の計算
-    calculator = ClassificationMetricsCalculator()
+    calculator = ClassificationMetricsCalculator(num_classes=6)
     video_metrics = calculator.calculate_multilabel_metrics_per_video(hard_multilabel_results)
     overall_metrics = calculator.calculate_multilabel_overall_metrics(hard_multilabel_results)
-    # ## 各動画フォルダにマルチラベルのメトリクスを保存
+    ## 各動画フォルダにマルチラベルのメトリクスを保存
     save_video_metrics_to_csv(video_metrics, Path(save_dir), methods = 'threshold_50%')
-    save_overall_metrics_to_csv(overall_metrics, Path(save_dir), methods = 'threshold_50%')
-    
-    # ハードラベルの結果を読み込む
-    hard_multilabel_results = {}
-    for folder_name in test_data_dirs:
-        csv_path = Path(f'{save_dir}/{folder_name}/threshold_50%/threshold_50%_results_{folder_name}.csv')
-        hard_multilabel_results[folder_name] = load_hard_multilabel_results(csv_path)
-        
-    # print(hard_multilabel_results.keys())
-    # print(len(hard_multilabel_results['20210524100043_000001-001'].multilabels))
-    # print(len(hard_multilabel_results['20210524100043_000001-001'].ground_truth_labels))
-    
+    ## 全体のメトリクスを保存
+    save_overall_metrics_to_csv(overall_metrics, Path(save_dir) / 'fold_results', methods = 'threshold_50%')
     
     # スライディングウィンドウ解析
-    # analyzer = Analyzer(save_dir, config.test.num_classes)
-    # all_window_results, all_window_metrics = analyzer.analyze_sliding_windows(
-    #     hard_multilabel_results,
-    #     visualizer,
-    #     calculator
-    # )
-    
-    # スライディングウィンドウを適用して、平滑化されたラベルを生成
     analyzer = Analyzer(save_dir, config.test.num_classes)
-    
-    # スライディングウィンドウの結果を保存するディレクトリを作成
-    sliding_window_dir = Path(save_dir) / f'sliding_window_{window_size}_results'
-    sliding_window_dir.mkdir(exist_ok=True)
-    
-    # スライディングウィンドウの適用
-    sliding_window_results = analyzer.apply_sliding_window_to_hard_multilabel_results(
-        hard_multilabel_results, 
-        window_size=window_size
+
+    all_window_results = analyzer.analyze_sliding_windows(
+        Path(save_dir),
+        hard_multilabel_results,
+        visualizer,
+        calculator,
+        window_sizes=window_sizes
     )
     
-    # 平滑化されたラベルの可視化を新しいディレクトリに保存
-    visualizer.save_singlelabel_visualization(
-        sliding_window_results, 
-        save_path=sliding_window_dir,
-        methods=f'sliding_window_{window_size}'
-    )
-    
-    # 平滑化されたラベルのメトリクスを計算
-    sliding_window_video_metrics = calculator.calculate_singlelabel_metrics_per_video(sliding_window_results)
-    sliding_window_overall_metrics = calculator.calculate_singlelabel_overall_metrics(sliding_window_results)
-    
-    # 各動画フォルダのメトリクスを新しいディレクトリに保存
-    save_video_metrics_to_csv(
-        sliding_window_video_metrics, 
-        sliding_window_dir, 
-        methods=f'sliding_window_{window_size}'
-    )
-    
-    # 全体のメトリクスを新しいディレクトリに保存
-    save_overall_metrics_to_csv(
-        sliding_window_overall_metrics, 
-        sliding_window_dir, 
-        methods=f'sliding_window_{window_size}'
-    )
-    
-    return sliding_window_results
+    return hard_multilabel_results, all_window_results
     
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Multi-class organ classification model using ResNet')
     parser.add_argument('-c', '--config', help='Path to config file', default='config.yaml')
     return parser.parse_args()
-    
+
 def main():
     args = parse_args()
     config = load_test_config(args.config)
@@ -159,81 +103,100 @@ def main():
     # dataloaderの作成
     splitter = CrossValidationSplitter(splits=config.splits.root)
     split_folders = splitter.get_split_folders()
+        
+    # 全foldの結果を保存する辞書
+    all_folds_hard_multilabel_results = {}
+    all_folds_all_window_results = {}
     
-    # window_sizeのリスト
-    window_sizes = range(1, 7, 2)
-    results_by_window = {}
-    
+    # window_sizeの探索範囲
+    # window_sizes = list(range(9, 13, 2))
+    window_sizes = [1, 11]
+    # window_sizeごとに結果を保存する辞書を作成
     for window_size in window_sizes:
-        logging.info(f"Processing window size: {window_size}")
-        
-        # 全foldの結果を保存する辞書
-        all_folds_results = {}
-        
-        # 集約した結果を保存するディレクトリ
-        # save_path = Path(f"/home/tanaka/0218/Treatment_CNN/{config.test.num_classes}class_resnet18_test") / f'all_folds_results_window_{window_size}'
-        save_path = Path(f"{config.paths.save_dir}") / f'all_folds_results_window_{window_size}'
-        save_path.mkdir(exist_ok=True)
-        
-        for fold_idx, (split_data, model_path) in enumerate(zip(split_folders, config.paths.model_paths)):
-            # fold用の結果保存フォルダを作成
-            fold_save_dir = Path(config.paths.save_dir) / f"fold_{fold_idx}"
-            fold_save_dir.mkdir(parents=True, exist_ok=True)
+        if window_size not in all_folds_all_window_results:
+            all_folds_all_window_results[f'window_size_{window_size}'] = {}
+    
+    
+    for fold_idx, (split_data, model_path) in enumerate(zip(split_folders, config.paths.model_paths)):
+        # fold用の結果保存フォルダを作成
+        fold_save_dir = Path(config.paths.save_dir) / f"fold_{fold_idx}"
+        fold_save_dir.mkdir(parents=True, exist_ok=True)
 
-            print(f"Started test for fold {fold_idx}")
+        print(f"Started test for fold {fold_idx}")
 
-            sliding_window_results = test(config=config, 
-                                          test_data_dirs=split_data['test'], 
-                                          model_path=model_path,
-                                          save_dir=fold_save_dir,
-                                          window_size=window_size
-                                          )
-            
-            # 各foldの結果を全体の辞書に追加
+        hard_multilabel_results, all_window_results = test(config=config, 
+                                                           test_data_dirs=split_data['test'],
+                                                           model_path=model_path,
+                                                           save_dir=fold_save_dir,
+                                                           window_sizes=window_sizes
+                                                           )
+        
+        # 各foldの結果を全体の辞書に追加
+        for folder_name, result in hard_multilabel_results.items():
+            if folder_name not in all_folds_hard_multilabel_results:
+                all_folds_hard_multilabel_results[folder_name] = result
+
+        # Then store the results
+        for window_size, sliding_window_results in all_window_results.items():
             for folder_name, result in sliding_window_results.items():
-                if folder_name not in all_folds_results:
-                    all_folds_results[folder_name] = result
-        
-        # 全foldの結果を集約して評価指標を計算
-        # calculator = ClassificationMetricsCalculator()
-        # metrics = calculator.calculate_all_folds_metrics(all_folds_results, save_path)
-        
-        # window_sizeごとの結果を保存
-        # results_by_window[window_size] = metrics
-    
-    # window_size比較結果の保存
-    # comparison_save_dir = Path(f"/home/tanaka/0218/Treatment_CNN/{config.test.num_classes}class_resnet18_test") / 'window_size_comparison'
-    # comparison_save_dir.mkdir(exist_ok=True)
-    # create_window_size_comparison(results_by_window, comparison_save_dir)
+                all_folds_all_window_results[window_size][folder_name] = result
 
-def create_window_size_comparison(results_by_window: dict, save_dir: Path):
-    """
-    全window_sizeのクラス別指標を比較するCSVを生成
-    """
-    window_summaries = []
+    # 全foldの結果を集約して評価指標を計算
+    calculator = ClassificationMetricsCalculator(num_classes=6)
+
+    # 各window_sizeの全foldの結果を集約して評価指標を計算
+    for window_size, all_window_results in all_folds_all_window_results.items():
+        save_dir = Path(config.paths.save_dir) / f'{window_size}'
+        save_dir.mkdir(parents=True, exist_ok=True)
+        metrics = calculator.calculate_all_folds_metrics(all_window_results, save_dir)
+
+
+
+# def main():
+#     args = parse_args()
+#     config = load_test_config(args.config)
     
-    for window_size, results in results_by_window.items():
-        # 各クラスの指標を抽出
-        for class_idx in range(6):
-            metrics = results['class_metrics'][class_idx]
+#     # 結果保存フォルダを作成
+#     Path(config.paths.save_dir).mkdir(exist_ok=True)
+    
+#     # dataloaderの作成
+#     splitter = CrossValidationSplitter(splits=config.splits.root)
+#     split_folders = splitter.get_split_folders()
+    
+#     # window_sizeのリスト
+#     window_sizes = range(1, 7, 2)
+#     results_by_window = {}
+    
+#     for window_size in window_sizes:
+#         logging.info(f"Processing window size: {window_size}")
+        
+#         # 全foldの結果を保存する辞書
+#         all_folds_results = {}
+        
+#         # 集約した結果を保存するディレクトリ
+#         # save_path = Path(f"/home/tanaka/0218/Treatment_CNN/{config.test.num_classes}class_resnet18_test") / f'all_folds_results_window_{window_size}'
+#         save_path = Path(f"{config.paths.save_dir}") / f'all_folds_results_window_{window_size}'
+#         save_path.mkdir(exist_ok=True)
+        
+#         for fold_idx, (split_data, model_path) in enumerate(zip(split_folders, config.paths.model_paths)):
+#             # fold用の結果保存フォルダを作成
+#             fold_save_dir = Path(config.paths.save_dir) / f"fold_{fold_idx}"
+#             fold_save_dir.mkdir(parents=True, exist_ok=True)
+
+#             print(f"Started test for fold {fold_idx}")
+
+#             sliding_window_results = test(config=config, 
+#                                           test_data_dirs=split_data['test'], 
+#                                           model_path=model_path,
+#                                           save_dir=fold_save_dir,
+#                                           window_size=window_size
+#                                           )
             
-            summary = {
-                'window_size': window_size,
-                'class': class_idx,
-                'precision': metrics['precision'],
-                'recall': metrics['recall'],
-                'accuracy': metrics['accuracy']
-            }
-            window_summaries.append(summary)
-    
-    # DataFrameに変換してソート
-    df = pd.DataFrame(window_summaries)
-    df = df.sort_values(['class', 'window_size'])
-    
-    # CSV保存
-    comparison_path = save_dir / 'window_size_class_metrics.csv'
-    df.to_csv(comparison_path, index=False)
-    logging.info(f'Window size comparison saved: {comparison_path}')
+#             # 各foldの結果を全体の辞書に追加
+#             for folder_name, result in sliding_window_results.items():
+#                 if folder_name not in all_folds_results:
+#                     all_folds_results[folder_name] = result
+        
 
 if __name__ == '__main__':
     main()

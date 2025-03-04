@@ -1,10 +1,8 @@
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 from pathlib import Path
-from sklearn.metrics import confusion_matrix, precision_recall_curve, average_precision_score
 import logging
 import csv
+import svgwrite
 from PIL import Image, ImageDraw
 from engine.inference import InferenceResult
 from labeling.label_converter import HardMultiLabelResult, SingleLabelResult
@@ -71,7 +69,6 @@ class ResultsVisualizer:
       
     def save_multilabel_visualization(self, results: dict[str, HardMultiLabelResult], save_path: Path = None, methods: str = 'multilabel'):
         """マルチラベル分類の予測結果を時系列で可視化"""
-        
         for folder_name, result in results.items():
             # マルチラベルの予測結果を取得
             predicted_labels = np.array(result.multilabels)
@@ -81,36 +78,38 @@ class ResultsVisualizer:
             # 時系列の画像を作成
             timeline_width = n_images
             timeline_height = n_classes * (n_images // 10)
+
+            # 保存パスの設定
+            if save_path is None:
+                save_dir = self.save_dir / folder_name / methods
+                save_dir.mkdir(parents=True, exist_ok=True)
+                save_file = save_dir / f'{methods}_{folder_name}.svg'
+            else:
+                save_path = save_path / folder_name / methods
+                save_path.mkdir(parents=True, exist_ok=True)
+                save_file = save_path / f'{methods}_{folder_name}.svg'
             
-            timeline_image = Image.new('RGB', (timeline_width, timeline_height), (255, 255, 255))
-            draw = ImageDraw.Draw(timeline_image)
-            
+            # SVGドキュメントの作成
+            dwg = svgwrite.Drawing(str(save_file), size=(timeline_width, timeline_height))
+            dwg.add(dwg.rect((0, 0), (timeline_width, timeline_height), fill='white'))
+
             for i in range(n_images):
                 labels = predicted_labels[i]
                 for label_idx, label_value in enumerate(labels):
                     if label_value == 1:
-                        row_idx = label_idx
-                        
                         x1 = i * (timeline_width // n_images)
                         x2 = (i + 1) * (timeline_width // n_images)
-                        y1 = row_idx * (n_images // 10)
-                        y2 = (row_idx + 1) * (n_images // 10)
+                        y1 = label_idx * (n_images // 10)
+                        y2 = (label_idx + 1) * (n_images // 10)
 
                         color = LABEL_COLORS.get(label_idx, DEFAULT_COLOR)
-                        draw.rectangle([x1, y1, x2, y2], fill=color)
+                        # RGBをSVG用の16進数カラーコードに変換
+                        color_hex = f'#{color[0]:02x}{color[1]:02x}{color[2]:02x}'
+                        dwg.add(dwg.rect((x1, y1), (x2-x1, y2-y1), fill=color_hex))
 
-            # 保存パスを正しく設定
-            if save_path is None:
-                save_dir = self.save_dir / folder_name / methods
-                save_dir.mkdir(parents=True, exist_ok=True)
-                save_file = save_dir / f'{methods}_{folder_name}.png'
-            else:
-                save_path = save_path / folder_name / methods
-                save_path.mkdir(parents=True, exist_ok=True)  # ディレクトリが存在しない場合は作成
-                save_file = save_path / f'{methods}_{folder_name}.png'
-            
-            timeline_image.save(save_file)
-            logging.info(f'Timeline image saved at {save_file}')
+            # SVGファイルを保存
+            dwg.save()
+            logging.info(f'SVG timeline image saved at {save_file}')
             
     def save_singlelabel_visualization(self, results: dict[str, SingleLabelResult], save_path: Path = None, methods: str = 'singlelabel'):
         """シングルラベル分類の予測結果を時系列で可視化"""
@@ -123,28 +122,32 @@ class ResultsVisualizer:
             timeline_width = n_images
             timeline_height = n_images // 10
             
-            timeline_image = Image.new('RGB', (timeline_width, timeline_height), (255, 255, 255))
-            draw = ImageDraw.Draw(timeline_image)
-            
+            # 保存パスを設定
+            if save_path is None:
+                save_dir = self.save_dir / folder_name / methods
+                save_dir.mkdir(parents=True, exist_ok=True)
+                save_file = save_dir / f'{methods}_{folder_name}.svg'
+            else:
+                save_path = save_path / folder_name / methods
+                save_path.mkdir(parents=True, exist_ok=True)
+                save_file = save_path / f'{methods}_{folder_name}.svg'
+                
+            # SVGドキュメントの作成
+            dwg = svgwrite.Drawing(str(save_file), size=(timeline_width, timeline_height))
+            dwg.add(dwg.rect((0, 0), (timeline_width, timeline_height), fill='white'))
+
             for i in range(n_images):
                 label = predicted_labels[i]
                 x1 = i * (timeline_width // n_images)
                 x2 = (i + 1) * (timeline_width // n_images)
                 
                 color = LABEL_COLORS.get(label, DEFAULT_COLOR)
-                draw.rectangle([x1, 0, x2, timeline_height], fill=color)
-                
-            # 保存パスを正しく設定
-            if save_path is None:
-                save_dir = self.save_dir / folder_name / methods
-                save_dir.mkdir(parents=True, exist_ok=True)
-                save_file = save_dir / f'{methods}_{folder_name}.png'
-            else:
-                save_path.mkdir(parents=True, exist_ok=True)  # ディレクトリが存在しない場合は作成
-                save_file = save_path / f'{methods}_{folder_name}.png'
-                
-            timeline_image.save(save_file)
-            logging.info(f'Timeline image saved at {save_file}')
+                color_hex = f'#{color[0]:02x}{color[1]:02x}{color[2]:02x}'
+                dwg.add(dwg.rect((x1, 0), (x2-x1, timeline_height), fill=color_hex))
+
+            # SVGファイルを保存
+            dwg.save()
+            logging.info(f'SVG timeline image saved at {save_file}')
             
     def save_main_classes_visualization(self, results: dict[str, HardMultiLabelResult], save_path: Path = None):
         """正解ラベルを時系列で可視化"""
@@ -157,9 +160,19 @@ class ResultsVisualizer:
             timeline_width = n_images
             timeline_height = n_images // 10
             
-            timeline_image = Image.new('RGB', (timeline_width, timeline_height), (255, 255, 255))
-            draw = ImageDraw.Draw(timeline_image)
-            
+            # 保存パスを設定
+            if save_path is None:
+                save_dir = self.save_dir / folder_name
+                save_dir.mkdir(parents=True, exist_ok=True)
+                save_file = save_dir / f'main_classes_{folder_name}.svg'
+            else:
+                save_path.mkdir(parents=True, exist_ok=True)
+                save_file = save_path / f'main_classes_{folder_name}.svg'
+
+            # SVGドキュメントの作成
+            dwg = svgwrite.Drawing(str(save_file), size=(timeline_width, timeline_height))
+            dwg.add(dwg.rect((0, 0), (timeline_width, timeline_height), fill='white'))
+
             for i in range(n_images):
                 labels = ground_truth_labels[i]
                 for label_idx, label_value in enumerate(labels):
@@ -168,19 +181,12 @@ class ResultsVisualizer:
                         x2 = (i + 1) * (timeline_width // n_images)
 
                         color = LABEL_COLORS.get(label_idx, DEFAULT_COLOR)
-                        draw.rectangle([x1, 0, x2, timeline_height], fill=color)
+                        color_hex = f'#{color[0]:02x}{color[1]:02x}{color[2]:02x}'
+                        dwg.add(dwg.rect((x1, 0), (x2-x1, timeline_height), fill=color_hex))
 
-            # 保存パスを正しく設定
-            if save_path is None:
-                save_dir = self.save_dir / folder_name
-                save_dir.mkdir(parents=True, exist_ok=True)
-                save_file = save_dir / f'main_classes_{folder_name}.png'
-            else:
-                save_path.mkdir(parents=True, exist_ok=True)
-                save_file = save_path / f'main_classes_{folder_name}.png'
-            
-            timeline_image.save(save_file)
-            logging.info(f'Main classes timeline image saved at {save_file}')
+            # SVGファイルを保存
+            dwg.save()
+            logging.info(f'Main classes SVG timeline saved at {save_file}')
             
     # def plot_confusion_matrices(self, predictions: np.ndarray, labels: np.ndarray, 
     #                           class_names: list = None):

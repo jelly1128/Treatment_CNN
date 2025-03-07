@@ -11,7 +11,7 @@ LABELING_SPLIT = (
     "20220322102354_000001-002",
 )
 
-def convert_to_multilabel(csv_file_path, threshold=0.5):
+def convert_to_multi_label(csv_file_path, threshold=0.5):
     """
     one-hot形式のCSVファイルをマルチラベル形式に変換する関数
 
@@ -30,7 +30,7 @@ def convert_to_multilabel(csv_file_path, threshold=0.5):
     true_columns = [col for col in df.columns if col.startswith('True_Class')]
 
     # Pred_Classをマルチラベル形式に変換
-    def get_multilabel_labels(row, columns, threshold):
+    def get_multi_label_labels(row, columns, threshold):
         labels = []
         for idx, value in enumerate(row):
             if value >= threshold:
@@ -46,7 +46,7 @@ def convert_to_multilabel(csv_file_path, threshold=0.5):
         return ' '.join(labels) if labels else 'None'  # ラベルがない場合は 'None' を返す
 
     # Pred_ClassとTrue_Classをマルチラベル形式に変換
-    df['Pred_Class'] = df[pred_columns].apply(lambda row: get_multilabel_labels(row, pred_columns, threshold), axis=1)
+    df['Pred_Class'] = df[pred_columns].apply(lambda row: get_multi_label_labels(row, pred_columns, threshold), axis=1)
     df['True_Class'] = df[true_columns].apply(lambda row: get_true_labels(row, true_columns), axis=1)
 
     # 必要な列だけを選択
@@ -66,7 +66,7 @@ def convert_to_multilabel(csv_file_path, threshold=0.5):
     result_df = result_df.sort_values(by='Sort_Key').drop(columns=['Sort_Key'])
 
     # 新しいCSVファイルに保存
-    result_df.to_csv(f'{csv_file_path}_{threshold*100}%_multilabel.csv', index=False)
+    result_df.to_csv(f'{csv_file_path}_{threshold*100}%_multi_label.csv', index=False)
 
 # 使用例
 if __name__ == "__main__":
@@ -75,9 +75,9 @@ if __name__ == "__main__":
     # csv_file_path = f'/home/tanaka/labeling/15class_1/{LABELING_SPLIT[split_index]}/threshold_results'
 
     # 関数を呼び出して変換を実行
-    # convert_to_multilabel(csv_file_path, threshold=0.5)
+    # convert_to_multi_label(csv_file_path, threshold=0.5)
     
     # ラベリングsplitの全てを変換
     for split_index in range(len(LABELING_SPLIT)):
         csv_file_path = f'/home/tanaka/labeling/15class_2/{LABELING_SPLIT[split_index]}/threshold_results'
-        convert_to_multilabel(csv_file_path, threshold=0.9)
+        convert_to_multi_label(csv_file_path, threshold=0.9)

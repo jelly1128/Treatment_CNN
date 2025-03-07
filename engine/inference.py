@@ -1,5 +1,4 @@
 from pathlib import Path
-import logging
 import torch
 from torch.utils.data import DataLoader
 import csv
@@ -41,9 +40,10 @@ class Inference:
             test_dataloader: テスト用データローダー
 
         Returns:
-            folder_probabilities: 予測確率のリスト
-            folder_labels: 正解ラベルのリスト
-            folder_image_paths: 画像パスのリスト
+            InferenceResult: 推論結果
+            - image_paths: 画像パスのリスト
+            - probabilities: 予測確率のリスト
+            - labels: 正解ラベルのリスト
         """
         results = InferenceResult(image_paths=[], probabilities=[], labels=[])
         
@@ -64,20 +64,20 @@ class Inference:
         
         return results
 
-    def _save_results(self, save_dir: str, folder_name: str, results: InferenceResult):
+    def _save_results(self, save_dir_path: Path, video_name: str, results: InferenceResult):
         """
         推論結果を保存する。
 
         Args:
-            save_dir: 保存先のディレクトリ
-            folder_name: フォルダ名
+            save_dir_path: 保存先のディレクトリパス
+            video_name: テスト動画のフォルダ名
             results: (probabilities, labels, image_paths)のタプル
         """
-        save_path = Path(save_dir, folder_name)
+        save_path = save_dir_path / video_name
         save_path.mkdir(parents=True, exist_ok=True)
         
         # 結果をCSVファイルに保存
-        self._save_raw_results(save_path / f'raw_results_{folder_name}.csv', results)
+        self._save_raw_results(save_path / f'raw_results_{video_name}.csv', results)
         
     def _save_raw_results(self, csv_path: Path, results: InferenceResult):
         """
@@ -95,12 +95,10 @@ class Inference:
             header = ['Image_Path'] + [f"Pred_Class_{i}" for i in range(len(results.probabilities[0]))] + \
                     [f"True_Class_{i}" for i in range(len(results.labels[0]))]
             writer.writerow(header)
-            for img_path, probs, lbls in zip(results.image_paths, results.probabilities, results.labels):
-                writer.writerow([img_path] + probs + lbls)
+            for img_path, probs, label in zip(results.image_paths, results.probabilities, results.labels):
+                writer.writerow([img_path] + probs + label)
         
-        logging.info(f"Saved raw results: {csv_path}")
-        
-    def run(self, save_dir: str, test_dataloaders: dict[str, DataLoader]) -> dict[str, InferenceResult]:
+    def run(self, save_dir_path: str, test_dataloaders: dict[str, DataLoader]) -> dict[str, InferenceResult]:
         """
         推論を実行し、モデルの出力を返す。
 
@@ -110,22 +108,20 @@ class Inference:
 
         Returns:
             results: フォルダごとの推論結果を格納した辞書
-            folder_results: フォルダごとの推論結果
+            - video_name: フォルダ名
+            - results: 推論結果
         """
         results = {}
         
-        for folder_name, test_dataloader in test_dataloaders.items():
-            logging.info(f"Testing on {folder_name}...")
+        for video_name, test_dataloader in test_dataloaders.items():
             
             # 推論実行
             folder_results = self._run_inference(test_dataloader)
             
             # 結果を保存
-            self._save_results(save_dir, folder_name, folder_results)
+            self._save_results(save_dir_path, video_name, folder_results)
             
             # 結果を辞書に格納
-            results[folder_name] = folder_results
-
-        logging.info("テスト完了。結果を保存しました。")
+            results[video_name] = folder_results
 
         return results

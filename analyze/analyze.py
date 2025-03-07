@@ -7,15 +7,15 @@ import logging
 from PIL import Image, ImageDraw
 
 class Analyzer:
-    def __init__(self, save_dir, num_classes):
+    def __init__(self, save_dir_path, num_classes):
         """
         推論結果を解析するクラス。
 
         Args:
-            save_dir (str): 結果を保存するディレクトリ
+            save_dir_path (str): 結果を保存するディレクトリ
             num_classes (int): クラス数
         """
-        self.save_dir = save_dir
+        self.save_dir_path = save_dir_path
         self.num_classes = num_classes
 
     def analyze(self, results):
@@ -28,7 +28,7 @@ class Analyzer:
         for folder_name, (probabilities, labels, image_paths) in results.items():
             logging.info(f"Analyzing results for {folder_name}...")
 
-            folder_path = os.path.join(self.save_dir, folder_name)
+            folder_path = os.path.join(self.save_dir_path, folder_name)
             os.makedirs(folder_path, exist_ok=True)
 
             self.save_raw_results(folder_path, image_paths, probabilities, labels)
@@ -52,7 +52,7 @@ class Analyzer:
             # print("df.columns:", df.columns)  # データフレームのカラム一覧を出力
             # print(df.head())  # 最初の数行を出力
 
-            self.visualize_multilabel_timeline(df, folder_path, folder_name)
+            self.visualize_multi_label_timeline(df, folder_path, folder_name)
             self.visualize_ground_truth_timeline(df, folder_path, folder_name)
             
     def save_raw_results(self, folder_path, image_paths, probabilities, labels):
@@ -239,7 +239,7 @@ class Analyzer:
         return final_results
     
 
-    def visualize_multilabel_timeline(self, df, save_dir, filename):
+    def visualize_multi_label_timeline(self, df, save_dir_path, filename):
         """マルチラベル分類の予測結果を時系列で可視化"""
         label_colors = {
             0: (254, 195, 195),  # white
@@ -276,11 +276,11 @@ class Analyzer:
                     color = label_colors.get(label_idx, default_color)
                     draw.rectangle([x1, y1, x2, y2], fill=color)
 
-        timeline_image.save(os.path.join(save_dir, f"{filename}_predicted_timeline.png"))
-        logging.info(f'Timeline image saved at {os.path.join(save_dir, "multilabel_timeline.png")}')
+        timeline_image.save(os.path.join(save_dir_path, f"{filename}_predicted_timeline.png"))
+        logging.info(f'Timeline image saved at {os.path.join(save_dir_path, "multi_label_timeline.png")}')
 
 
-    def visualize_ground_truth_timeline(self, df, save_dir, filename):
+    def visualize_ground_truth_timeline(self, df, save_dir_path, filename):
         """正解ラベルを時系列で可視化"""
 
         label_colors = {
@@ -318,14 +318,14 @@ class Analyzer:
                     color = label_colors.get(label_idx, default_color)
                     draw.rectangle([x1, y1, x2, y2], fill=color)
 
-        timeline_image.save(os.path.join(save_dir, f"{filename}_ground_truth_timeline.png"))
-        logging.info(f'Ground truth timeline image saved at {os.path.join(save_dir, f"{filename}_ground_truth_timeline.png")}')
+        timeline_image.save(os.path.join(save_dir_path, f"{filename}_ground_truth_timeline.png"))
+        logging.info(f'Ground truth timeline image saved at {os.path.join(save_dir_path, f"{filename}_ground_truth_timeline.png")}')
 
 
 ###
 # 以下メイン関数下で使用するコード
 ###
-def visualize_timeline(labels, save_dir, filename, num_classes):
+def visualize_timeline(labels, save_dir_path, filename, num_classes):
     # Define the colors for each class
     label_colors = {
         0: (254, 195, 195),       # white
@@ -369,9 +369,9 @@ def visualize_timeline(labels, save_dir, filename, num_classes):
         draw.rectangle([x1, y1, x2, y2], fill=color)
                 
     # Save the image
-    os.makedirs(save_dir, exist_ok=True)
-    timeline_image.save(os.path.join(save_dir, f'{filename}.png'))
-    print(f'Timeline image saved at {os.path.join(save_dir, f"{filename}.png")}')
+    os.makedirs(save_dir_path, exist_ok=True)
+    timeline_image.save(os.path.join(save_dir_path, f'{filename}.png'))
+    print(f'Timeline image saved at {os.path.join(save_dir_path, f"{filename}.png")}')
 
 def load_raw_results(csv_path, num_classes):
     """
@@ -475,7 +475,7 @@ def calculate_metrics(true_labels, smoothed_labels):
         })
     return cm, metrics
 
-def visualize_timeline(labels, save_dir, filename, n_class):
+def visualize_timeline(labels, save_dir_path, filename, n_class):
     """
     マルチラベルタイムラインを可視化して保存
     """
@@ -522,9 +522,9 @@ def visualize_timeline(labels, save_dir, filename, n_class):
         draw.rectangle([x1, y1, x2, y2], fill=color)
                 
     # Save the image
-    os.makedirs(save_dir, exist_ok=True)
-    timeline_image.save(os.path.join(save_dir, f'{filename}.png'))
-    print(f'Timeline image saved at {os.path.join(save_dir, f"{filename}.png")}')
+    os.makedirs(save_dir_path, exist_ok=True)
+    timeline_image.save(os.path.join(save_dir_path, f'{filename}.png'))
+    print(f'Timeline image saved at {os.path.join(save_dir_path, f"{filename}.png")}')
     
     
 # def process_all_results(dataset_root, num_classes, window_size=5, step=1, methods=None):
@@ -726,7 +726,7 @@ def process_all_results(dataset_root, num_classes, window_sizes=[3,5,7,9,11,13,1
     
     return results_by_window
 
-def create_window_size_comparison(results_by_window, save_dir):
+def create_window_size_comparison(results_by_window, save_dir_path):
     """全window_sizeのクラス別指標を比較するCSVを生成"""
     window_summaries = []
     
@@ -753,11 +753,11 @@ def create_window_size_comparison(results_by_window, save_dir):
     df = df.sort_values(['class', 'window_size'])
     
     # CSV保存
-    comparison_path = os.path.join(save_dir, 'window_size_class_metrics.csv')
+    comparison_path = os.path.join(save_dir_path, 'window_size_class_metrics.csv')
     df.to_csv(comparison_path, index=False)
     print(f'Window size comparison saved: {comparison_path}')
 
-# def create_window_size_comparison(results_by_window, save_dir):
+# def create_window_size_comparison(results_by_window, save_dir_path):
 #     """Create summary comparing metrics across different window sizes"""
 #     window_summaries = []
     
@@ -776,7 +776,7 @@ def create_window_size_comparison(results_by_window, save_dir):
     
 #     # Save comprehensive summary
 #     pd.DataFrame(window_summaries).to_csv(
-#         os.path.join(save_dir, 'window_size_comparison.csv'),
+#         os.path.join(save_dir_path, 'window_size_comparison.csv'),
 #         index=False
 #     )
 
@@ -806,13 +806,13 @@ def save_confusion_matrix(cm, save_path):
 def main():
     logging.basicConfig(level=logging.INFO)
     num_classes = 6
-    save_dir = f"{num_classes}class_resnet18_test"
-    os.makedirs(save_dir, exist_ok=True)
+    save_dir_path = f"{num_classes}class_resnet18_test"
+    os.makedirs(save_dir_path, exist_ok=True)
     
     window_sizes = [1,3,5,7, 9,11,13,15,17,19, 21,23, 25,27,29,31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 59, 61]
     # window_sizes = [1]
     results = process_all_results(
-        dataset_root=save_dir,
+        dataset_root=save_dir_path,
         num_classes=num_classes,
         window_sizes=window_sizes
     )
@@ -820,11 +820,11 @@ def main():
 # def main():
 #     logging.basicConfig(level=logging.INFO)
 #     num_classes = 15
-#     save_dir = f"{num_classes}class_results"
-#     os.makedirs(save_dir, exist_ok=True)
+#     save_dir_path = f"{num_classes}class_results"
+#     os.makedirs(save_dir_path, exist_ok=True)
     
 #     metrics = process_all_results(
-#         dataset_root=save_dir,
+#         dataset_root=save_dir_path,
 #         num_classes=num_classes,
 #         window_size=15,
 #         step=1
@@ -852,7 +852,7 @@ def main():
 #         }])
 #     ])
     
-#     raw_summary.to_csv(os.path.join(save_dir, 'metrics_summary_raw.csv'), index=False)
+#     raw_summary.to_csv(os.path.join(save_dir_path, 'metrics_summary_raw.csv'), index=False)
     
 #     # Repeat for smoothed predictions
 #     smoothed_summary = pd.DataFrame([
@@ -875,7 +875,7 @@ def main():
 #         }])
 #     ])
     
-#     smoothed_summary.to_csv(os.path.join(save_dir, 'metrics_summary_smoothed.csv'), index=False)
+#     smoothed_summary.to_csv(os.path.join(save_dir_path, 'metrics_summary_smoothed.csv'), index=False)
 
 if __name__ == '__main__':
     main()

@@ -1,6 +1,5 @@
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, multilabel_confusion_matrix
 import numpy as np
-import csv
 from labeling.label_converter import HardMultiLabelResult, SingleLabelResult
 import pandas as pd
 from pathlib import Path
@@ -9,7 +8,7 @@ class ClassificationMetricsCalculator:
     def __init__(self, num_classes: int = 15):
         self.num_classes = num_classes
     
-    def calculate_metrics_multilabel_per_class(self, y_true, y_pred):
+    def calculate_metrics_multi_label_per_class(self, y_true, y_pred):
         """
         各クラスごとのTP, FP, TN, FNを計算
         
@@ -54,7 +53,7 @@ class ClassificationMetricsCalculator:
         return np.array(precisions), np.array(recalls), np.array(f1_scores), np.array(accuracies), np.array(confusion_matrices)
     
     
-    def calculate_metrics_singlelabel_per_class(self, y_true, y_pred):
+    def calculate_metrics_single_label_per_class(self, y_true, y_pred):
         """
         シングルラベル（0-5のクラスラベル）の予測に対して、
         各クラスごとのTP, FP, TN, FNを計算
@@ -106,12 +105,12 @@ class ClassificationMetricsCalculator:
         return np.array(precisions), np.array(recalls), np.array(f1_scores), np.array(accuracies), np.array(confusion_matrices)
             
 
-    def calculate_multilabel_metrics_per_video(self, hard_multilabel_results: dict[str, HardMultiLabelResult]) -> dict[str, dict[str, float]]:
+    def calculate_multi_label_metrics_per_video(self, hard_multi_label_results: dict[str, HardMultiLabelResult]) -> dict[str, dict[str, float]]:
         """
         各動画単位の混同行列と適合率・再現率・正解率を計算する関数
 
         Args:
-            hard_multilabel_results (dict[str, HardMultiLabelResult]): 各フォルダのマルチラベルの結果
+            hard_multi_label_results (dict[str, HardMultiLabelResult]): 各フォルダのマルチラベルの結果
 
         Returns:
             dict: 各動画のメトリクスを格納した辞書
@@ -125,11 +124,11 @@ class ClassificationMetricsCalculator:
         """
         video_metrics = {}
 
-        for folder_name, hard_multilabel_result in hard_multilabel_results.items():
-            y_true = np.array(hard_multilabel_result.ground_truth_labels)
-            y_pred = np.array(hard_multilabel_result.multilabels)
+        for folder_name, hard_multi_label_result in hard_multi_label_results.items():
+            y_true = np.array(hard_multi_label_result.ground_truth_labels)
+            y_pred = np.array(hard_multi_label_result.multi_labels)
             
-            precision, recall, f1_score, accuracy, cm = self.calculate_metrics_multilabel_per_class(y_true, y_pred)
+            precision, recall, f1_score, accuracy, cm = self.calculate_metrics_multi_label_per_class(y_true, y_pred)
             video_metrics[folder_name] = {
                 'precision': precision,
                 'recall': recall,
@@ -140,12 +139,12 @@ class ClassificationMetricsCalculator:
         
         return video_metrics
 
-    def calculate_multilabel_overall_metrics(self, hard_multilabel_results: dict[str, HardMultiLabelResult]):
+    def calculate_multi_label_overall_metrics(self, hard_multi_label_results: dict[str, HardMultiLabelResult]):
         """
         全動画の混同行列と適合率・再現率・正解率を計算する関数
 
         Args:
-            hard_multilabel_results (dict[str, HardMultiLabelResult]): 各フォルダのマルチラベルの結果
+            hard_multi_label_results (dict[str, HardMultiLabelResult]): 各フォルダのマルチラベルの結果
 
         Returns:
             dict: 全動画のメトリクスを格納した辞書
@@ -156,9 +155,9 @@ class ClassificationMetricsCalculator:
         y_true = []
         y_pred = []
 
-        for hard_multilabel_result in hard_multilabel_results.values():
-            y_true.extend(hard_multilabel_result.ground_truth_labels)
-            y_pred.extend(hard_multilabel_result.multilabels)
+        for hard_multi_label_result in hard_multi_label_results.values():
+            y_true.extend(hard_multi_label_result.ground_truth_labels)
+            y_pred.extend(hard_multi_label_result.multi_labels)
         
         y_true = np.array(y_true)
         y_pred = np.array(y_pred)
@@ -205,7 +204,7 @@ class ClassificationMetricsCalculator:
             'class_confusion_matrix': class_confusion_matrix  # クラス数×クラス数の混同行列
         }
         
-    def calculate_singlelabel_metrics_per_video(self, single_label_results: dict[str, SingleLabelResult]) -> dict[str, dict[str, float]]:
+    def calculate_single_label_metrics_per_video(self, single_label_results: dict[str, SingleLabelResult]) -> dict[str, dict[str, float]]:
         """
         各動画単位の混同行列と適合率・再現率・正解率を計算する関数
 
@@ -220,7 +219,7 @@ class ClassificationMetricsCalculator:
             y_true = np.array(single_label_result.ground_truth_labels)
             y_pred = np.array(single_label_result.single_labels)
             
-            precision, recall, f1_score, accuracy, cm = self.calculate_metrics_singlelabel_per_class(y_true, y_pred)
+            precision, recall, f1_score, accuracy, cm = self.calculate_metrics_single_label_per_class(y_true, y_pred)
             video_metrics[folder_name] = {
                 'precision': precision,
                 'recall': recall,
@@ -231,7 +230,7 @@ class ClassificationMetricsCalculator:
         
         return video_metrics
     
-    def calculate_singlelabel_overall_metrics(self, single_label_results: dict[str, SingleLabelResult]):
+    def calculate_single_label_overall_metrics(self, single_label_results: dict[str, SingleLabelResult]):
         """
         シングルラベル（0-5のクラスラベル）の予測に対して、
         全動画の混同行列と各クラスの精度指標を計算する関数
@@ -298,8 +297,13 @@ class ClassificationMetricsCalculator:
         全フォールドのスライディングウィンドウ適用後の結果を統合して評価指標を計算し保存します。
         
         Args:
-            all_folds_results (dict[str, SingleLabelResult]): 全フォルダのSingleLabelResult
-            save_dir (Path): 結果を保存するディレクトリ
+            all_folds_results (dict[str, SingleLabelResult]): 全フォールドの結果を含む辞書
+            save_dir (Path): 結果を保存するディレクトリのパス
+
+        Returns:
+            dict: 全フォールドのメトリクスを格納した辞書
+            - class_metrics: 各クラスの適合率・再現率・F1スコア・正解率
+            - per_class_confusion_matrices: 各クラスの2×2混同行列
         """
         y_true = []
         y_pred = []
@@ -352,17 +356,6 @@ class ClassificationMetricsCalculator:
         )
         cm_df.to_csv(save_dir / 'confusion_matrix.csv')
         
-        # 正規化した混同行列の保存
-        row_sums = class_confusion_matrix.sum(axis=1)
-        cm_normalized = np.divide(class_confusion_matrix, row_sums[:, np.newaxis], 
-                                where=row_sums[:, np.newaxis] != 0)
-        cm_norm_df = pd.DataFrame(
-            cm_normalized,
-            index=[f'True_{i}' for i in range(n_classes)],
-            columns=[f'Pred_{i}' for i in range(n_classes)]
-        )
-        cm_norm_df.to_csv(save_dir / 'confusion_matrix_normalized.csv')
-        
         # クラスごとの評価指標の保存
         metrics_df = pd.DataFrame([
             {
@@ -376,16 +369,9 @@ class ClassificationMetricsCalculator:
         ])
         metrics_df.to_csv(save_dir / 'class_metrics.csv', index=False)
         
-        # 全体の正解率の保存
-        overall_accuracy = np.sum(np.diag(class_confusion_matrix)) / np.sum(class_confusion_matrix)
-        with open(save_dir / 'overall_accuracy.txt', 'w') as f:
-            f.write(f"Overall Accuracy: {overall_accuracy:.4f}")
-        
         return {
             'class_metrics': class_metrics,
-            'per_class_confusion_matrices': np.array(per_class_confusion_matrices),
             'class_confusion_matrix': class_confusion_matrix,
-            'overall_accuracy': overall_accuracy
         }
             
     

@@ -6,4 +6,4 @@ test:
 paths:
   root: '/home/tanaka/demo_data'
   save_dir: '/home/tanaka/labeling/15class_1'
-  model: '/home/tanaka/labeling/models/multilabel_cross_valid_15class_fold1/model_best.pth'
+  model: '/home/tanaka/labeling/models/multi_label_cross_valid_15class_fold1/model_best.pth'

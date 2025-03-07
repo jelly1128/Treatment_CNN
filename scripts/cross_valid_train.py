@@ -35,7 +35,7 @@ def train_val(config: dict, train_data_dirs: list, val_data_dirs: list):
         num_gpus=num_gpus
     )
     
-    train_dataloader, val_dataloader = dataloader_factory.create_multilabel_dataloaders(train_data_dirs, val_data_dirs)
+    train_dataloader, val_dataloader = dataloader_factory.create_multi_label_dataloaders(train_data_dirs, val_data_dirs)
     
     model = setup_model(config, device, num_gpus, mode='train')
     

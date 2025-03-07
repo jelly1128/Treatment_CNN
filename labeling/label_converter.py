@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from engine.inference import InferenceResult
 import csv
-import logging
 from pathlib import Path
 
 @dataclass

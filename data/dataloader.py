@@ -38,7 +38,7 @@ class DataLoaderFactory:
             num_workers=4 * self.num_gpus
         )
 
-    def create_multilabel_dataloaders(self, train_data_dirs: list, val_data_dirs: list) -> tuple[DataLoader, DataLoader]:
+    def create_multi_label_dataloaders(self, train_data_dirs: list, val_data_dirs: list) -> tuple[DataLoader, DataLoader]:
         """
         訓練と検証用のデータローダーを作成する
 
@@ -66,7 +66,7 @@ class DataLoaderFactory:
 
         return train_loader, val_loader
 
-    def create_multilabel_test_dataloaders(self, test_data_dirs: list) -> dict[str, DataLoader]:
+    def create_multi_label_test_dataloaders(self, test_data_dirs: list) -> dict[str, DataLoader]:
         """
         テスト用のデータローダーを作成する
 

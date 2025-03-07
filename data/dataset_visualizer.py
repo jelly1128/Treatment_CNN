@@ -83,7 +83,7 @@ def visualize_dataset(dataset, output_dir, num_samples=500):
         print(f"Saved image with labels {label_text} to {output_path}")
         
 
-def visualize_multilabel_timeline(df, save_dir, filename, num_classes):
+def visualize_multi_label_timeline(df, save_dir, filename, num_classes):
     # Define the colors for each class
     label_colors = {
         0: (254, 195, 195),       # white
@@ -134,5 +134,5 @@ def visualize_multilabel_timeline(df, save_dir, filename, num_classes):
                 draw.rectangle([x1, y1, x2, y2], fill=color)
                 
     # Save the image
-    timeline_image.save(os.path.join(save_dir, f'{filename}_multilabel_timeline.png'))
-    print(f'Timeline image saved at {os.path.join(save_dir, "multilabel_timeline.png")}')
+    timeline_image.save(os.path.join(save_dir, f'{filename}_multi_label_timeline.png'))
+    print(f'Timeline image saved at {os.path.join(save_dir, "multi_label_timeline.png")}')

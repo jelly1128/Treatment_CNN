@@ -1,5 +1,5 @@
 from model.setup_models import setup_model
-from data.dataloader import create_multilabel_test_dataloaders
+from data.dataloader import create_multi_label_test_dataloaders
 from engine.inference import Inference
 from evaluate.analyzer import Analyzer
 
@@ -25,7 +25,7 @@ class Tester:
 #         self.config = config
 #         self.device = device
 #         self.num_gpus = num_gpus
-#         self.test_dataloaders = create_multilabel_test_dataloaders(config, test_dirs, num_gpus)
+#         self.test_dataloaders = create_multi_label_test_dataloaders(config, test_dirs, num_gpus)
 #         self.model = setup_model(config, device, num_gpus, mode='test')
 #         # self.metrics_calculator = ClassificationMetricsCalculator()
 #         self.inference = Inference(self.model, device)

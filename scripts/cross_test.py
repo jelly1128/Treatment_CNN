@@ -33,7 +33,7 @@ from models import AnomalyDetectionModel, TreatmentClassificationModel, MultiLab
 from evaluate_afafa import ModelEvaluator
 
 from config.config_loader import load_test_config
-from data.dataloader import create_multilabel_test_dataloaders
+from data.dataloader import create_multi_label_test_dataloaders
 from data.visualization import plot_dataset_samples, show_dataset_stats
 from engine.trainer import Trainer
 from engine.validator import Validator
@@ -224,7 +224,7 @@ def test_anomaly_detection_model(config):
                 # os._exit(0)
                 
         # CSVファイルへの保存設定
-        output_csv_file = f'{os.path.join(config.paths.save_dir, folder_name)}/multilabels_test_with_labels.csv'
+        output_csv_file = f'{os.path.join(config.paths.save_dir, folder_name)}/multi_labels_test_with_labels.csv'
         with open(output_csv_file, mode='w', newline='') as file:
             writer = csv.writer(file)
             
@@ -247,7 +247,7 @@ def test_anomaly_detection_model(config):
                 max_prob_index = np.argmax(probabilities)  # 最大の確率を持つクラスのインデックスを取得
                 pred_labels[i][max_prob_index] = 1         # 最大確率のクラスのラベルを1に設定
         
-        with open(f'{os.path.join(config.paths.save_dir, folder_name)}/multilabels_test_with_labels_50%.csv', mode='w', newline='') as file:
+        with open(f'{os.path.join(config.paths.save_dir, folder_name)}/multi_labels_test_with_labels_50%.csv', mode='w', newline='') as file:
             writer = csv.writer(file)
             
             # ヘッダーを定義
@@ -315,7 +315,7 @@ def test_anomaly_detection_model(config):
         df['Image_Path'] = subfolder_image_paths  # 画像パスを追加
 
         # タイムラインの可視化
-        visualize_multilabel_timeline(
+        visualize_multi_label_timeline(
             df=df,
             save_dir=os.path.join(config.paths.save_dir, folder_name),
             filename="predicted",

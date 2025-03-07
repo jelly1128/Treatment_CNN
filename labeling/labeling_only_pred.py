@@ -20,7 +20,7 @@ def extract_number(image_path):
         return int(match.group(1))
     return 0  # 数値がない場合は0を返す
 
-def convert_to_multilabel(csv_file_path, threshold=0.5):
+def convert_to_multi_label(csv_file_path, threshold=0.5):
     """
     one-hot形式のCSVファイルから予測ラベルのみを抽出し、
     各画像ごとに1行で、画像パスとそれぞれの予測ラベルを別セルに入れる形式に変換して保存する関数
@@ -63,11 +63,11 @@ def convert_to_multilabel(csv_file_path, threshold=0.5):
     result_df = result_df.sort_values(by='Sort_Key').drop(columns=['Sort_Key'])
 
     # 新しいCSVファイルに保存
-    result_df.to_csv(f'{csv_file_path}_{int(threshold*100)}%_multilabel.csv', index=False)
+    result_df.to_csv(f'{csv_file_path}_{int(threshold*100)}%_multi_label.csv', index=False)
 
 # 使用例
 if __name__ == "__main__":
     # ラベリングsplitの全てを変換（例：threshold=0.9）
     for split_index in range(len(LABELING_SPLIT)):
         csv_file_path = f'/home/tanaka/labeling/15class_1/{LABELING_SPLIT[split_index]}/raw_results'
-        convert_to_multilabel(csv_file_path, threshold=0.8)
+        convert_to_multi_label(csv_file_path, threshold=0.8)

@@ -31,6 +31,7 @@ class SingleLabelResult:
     single_labels: list[int]
     ground_truth_labels: list[int]
 
+
 class MultiToSingleLabelConverter:
     def __init__(self, inference_results_dict: dict[str, InferenceResult]):
         self.inference_results_dict = inference_results_dict

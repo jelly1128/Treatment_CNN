@@ -2,7 +2,7 @@ import argparse
 import logging
 from pathlib import Path
 
-from analyze.window_key import WindowSizeKey
+
 from config.config_loader import load_test_config
 from data.data_splitter import CrossValidationSplitter
 from data.dataloader import DataLoaderFactory
@@ -11,6 +11,7 @@ from engine.inference import Inference
 from evaluate.analyzer import Analyzer
 from utils.torch_utils import get_device_and_num_gpus, set_seed
 from utils.logger import setup_logging
+from utils.window_key import WindowSizeKey
 from evaluate.results_visualizer import ResultsVisualizer
 from labeling.label_converter import MultiToSingleLabelConverter
 from evaluate.metrics import ClassificationMetricsCalculator
@@ -51,11 +52,13 @@ def test(config: dict,
     test_dataloaders = dataloader_factory.create_multi_label_test_dataloaders(test_data_dirs)
     
     # モデルのセットアップ
-    model = setup_model(config=config, 
-                        device=device, 
-                        num_gpus=num_gpus, 
-                        mode='test', 
-                        model_path=model_path)
+    model = setup_model(
+        config=config, 
+        device=device, 
+        num_gpus=num_gpus, 
+        mode='test', 
+        model_path=model_path
+    )
     
     # 推論
     inference = Inference(model, device)

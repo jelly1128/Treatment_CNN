@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 import matplotlib.pyplot as plt
 from collections import Counter
@@ -53,8 +53,7 @@ def show_dataset_stats(dataloader):
         
         
 def visualize_dataset(dataset, output_dir, num_samples=500):
-    os.makedirs(output_dir, exist_ok=True)
-    
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
     for i in range(0, len(dataset), 100):
         images_list = []
         labels_list = []
@@ -77,62 +76,7 @@ def visualize_dataset(dataset, output_dir, num_samples=500):
         draw.text((10, 10), f"Labels: {label_text}", fill=(255, 255, 255), font=font)
         
         # 画像を保存
-        output_path = os.path.join(output_dir, f"sample_{i//100}.png")
+        output_path = Path(output_path) / f"sample_{i//100}.png"
         pil_image.save(output_path)
         
         print(f"Saved image with labels {label_text} to {output_path}")
-        
-
-def visualize_multi_label_timeline(df, save_dir, filename, num_classes):
-    # Define the colors for each class
-    label_colors = {
-        0: (254, 195, 195),       # white
-        1: (204, 66, 38),         # lugol
-        2: (57, 103, 177),        # indigo
-        3: (96, 165, 53),         # nbi
-        4: (86, 65, 72),          # outside
-        5: (159, 190, 183),       # bucket
-    }
-
-    # Default color for labels not specified in label_colors
-    default_color = (148, 148, 148)
-
-    # Extract the predicted labels columns
-    predicted_labels = df[[col for col in df.columns if 'Predicted' in col]].values
-
-    # Determine the number of images
-    n_images = len(predicted_labels)
-    
-    # Set timeline height based on the number of labels
-    timeline_width = n_images
-    timeline_height = num_classes * (n_images // 10)
-
-    # Create a blank image for the timeline
-    timeline_image = Image.new('RGB', (timeline_width, timeline_height), (255, 255, 255))
-    draw = ImageDraw.Draw(timeline_image)
-
-    # Iterate over each image (row in the CSV)
-    for i in range(n_images):
-        # Get the predicted labels for the current image
-        labels = predicted_labels[i]
-        
-        # Check each label and draw corresponding rectangles
-        for label_idx, label_value in enumerate(labels):
-            if label_value == 1:
-                row_idx = label_idx
-
-                # Calculate the position in the timeline
-                x1 = i * (timeline_width // n_images)
-                x2 = (i + 1) * (timeline_width // n_images)
-                y1 = row_idx * (n_images // 10)
-                y2 = (row_idx + 1) * (n_images // 10)
-                
-                # Get the color for the current label
-                color = label_colors.get(label_idx, default_color)
-                
-                # Draw the rectangle for the label
-                draw.rectangle([x1, y1, x2, y2], fill=color)
-                
-    # Save the image
-    timeline_image.save(os.path.join(save_dir, f'{filename}_multi_label_timeline.png'))
-    print(f'Timeline image saved at {os.path.join(save_dir, "multi_label_timeline.png")}')

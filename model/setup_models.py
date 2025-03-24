@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
-from .cnn_models import MultiLabelDetectionModel, MultiTaskDetectionModel, AnomalyDetectionModel
+from .cnn_models import MultiLabelDetectionModel, MultiTaskDetectionModel
+
+
 def setup_model(config, device, num_gpus, mode='train', model_path=None):
     """
     モデルをセットアップし、GPUに移動し、並列化する。

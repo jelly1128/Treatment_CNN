@@ -7,6 +7,7 @@ from scipy.stats import entropy
 import svgwrite
 import re
 from entropy_analyzer import EntropyDistributionAnalyzer
+from sklearn.metrics import multilabel_confusion_matrix, classification_report
 
 class PredictionCertaintyAnalyzer:
     def __init__(self, save_dir_path: Path, num_classes: int):
@@ -115,7 +116,7 @@ class PredictionCertaintyAnalyzer:
         return image_paths, multi_labels, ground_truth_labels
     
     
-    def analyze_prediction_certainty(self, inference_result: InferenceResult):
+    def analyze_prediction_certainty(self, inference_result: InferenceResult) -> list[float]:
         """
         予測確信度を解析する。
         """
@@ -159,7 +160,7 @@ class PredictionCertaintyAnalyzer:
         
         Args:
             entropies_list (list[float]): 予測確信度のリスト
-            save_path (Path): 保存先のパス
+            video_name (str): 動画名
         """
         n_images = len(entropies_list)
         
@@ -189,47 +190,72 @@ class PredictionCertaintyAnalyzer:
 
 def main():
     # 一つずつ
-    # raw_result_csv_path = Path("/home/tanaka/Treatment_CNN/7class_resnet18_multitask_anomaly_test/fold_0/20210524100043_000001-001/raw_results_20210524100043_000001-001.csv")
-    # threshold_result_csv_path = Path("/home/tanaka/Treatment_CNN/7class_resnet18_multitask_anomaly_test/fold_0/20210524100043_000001-001/threshold_50%/threshold_50%_results_20210524100043_000001-001.csv")
+    raw_result_csv_path = Path("/home/tanaka/Treatment_CNN/7class_resnet18_multitask_anomaly_test/fold_0/20210524100043_000001-001/raw_results_20210524100043_000001-001.csv")
+    threshold_result_csv_path = Path("/home/tanaka/Treatment_CNN/7class_resnet18_multitask_anomaly_test/fold_0/20210524100043_000001-001/threshold_50%/threshold_50%_results_20210524100043_000001-001.csv")
     
     # raw_result_csv_path = Path("/home/tanaka/Treatment_CNN/6class_resnet18_multitask_anomaly_test/fold_0/20210531112330_000001-001/raw_results_20210531112330_000001-001.csv")
     # threshold_result_csv_path = Path("/home/tanaka/Treatment_CNN/6class_resnet18_multitask_anomaly_test/fold_0/20210531112330_000001-001/threshold_50%/threshold_50%_results_20210531112330_000001-001.csv")
 
-    # analyzer = PredictionCertaintyAnalyzer(save_dir_path=Path("debug_results"), num_classes=7)
-    # raw_result = analyzer.load_inference_results(raw_result_csv_path)
-    # threshold_result = analyzer.load_threshold_results(threshold_result_csv_path)
+    analyzer = PredictionCertaintyAnalyzer(save_dir_path=Path("debug_results"), num_classes=7)
+    raw_result = analyzer.load_inference_results(raw_result_csv_path)
+    threshold_result = analyzer.load_threshold_results(threshold_result_csv_path)
 
-    # # 計算
-    # entropies_list = analyzer.analyze_prediction_certainty(raw_result)
+    # 計算
+    entropies_list = analyzer.analyze_prediction_certainty(raw_result)
 
-    # # 可視化
-    # analyzer.visualize_certainty(entropies_list)
+    # 可視化
+    # analyzer.visualize_certainty(entropies_list, '20210524100043_000001-001')
 
+    entropies_result = {
+        'image_paths': raw_result.image_paths,
+        'predictions': threshold_result.multi_labels,
+        'ground_truths': threshold_result.ground_truth_labels,
+        'entropies': entropies_list
+    }
 
-    # 全体
-    dir_path = Path("/home/tanaka/Treatment_CNN/7class_resnet18_multitask_anomaly_test")
+    confusion_matrix = multilabel_confusion_matrix(threshold_result.ground_truth_labels, threshold_result.multi_labels, labels=list(range(7)))
+    print(confusion_matrix)
+    print(classification_report(threshold_result.ground_truth_labels, threshold_result.multi_labels, labels=list(range(7))))
+
+    entropied_threshold_results = {
+        'predictions': [],
+        'ground_truths': []
+    }
+
+    for i in range(len(entropies_list)):
+        if entropies_list[i] < 0.3:
+            entropied_threshold_results['predictions'].append(threshold_result.multi_labels[i])
+            entropied_threshold_results['ground_truths'].append(threshold_result.ground_truth_labels[i])
+
+    print(len(entropied_threshold_results['predictions']))
+    entropied_threshold_cm = multilabel_confusion_matrix(entropied_threshold_results['ground_truths'], entropied_threshold_results['predictions'], labels=list(range(7)))
+    print(entropied_threshold_cm)
+    print(classification_report(entropied_threshold_results['ground_truths'], entropied_threshold_results['predictions'], labels=list(range(7))))
+
+    # # 全体
+    # dir_path = Path("/home/tanaka/Treatment_CNN/7class_resnet18_multitask_anomaly_test")
     
-    for i in range(5):
-        # 数字から始まる名前のフォルダを取得
-        video_dirs = dir_path.glob(f"fold_{i}/*")
+    # for i in range(5):
+    #     # 数字から始まる名前のフォルダを取得
+    #     video_dirs = dir_path.glob(f"fold_{i}/*")
         
-        for video_dir in video_dirs:
-            # フォルダ名からフォルダ名を取得
-            video_name = video_dir.name
+    #     for video_dir in video_dirs:
+    #         # フォルダ名からフォルダ名を取得
+    #         video_name = video_dir.name
 
-            if re.match(r"^\d+", video_name):
-                # print(video_name)
-                raw_result_csv_path = dir_path / f'fold_{i}' / video_name / f'raw_results_{video_name}.csv'
+    #         if re.match(r"^\d+", video_name):
+    #             # print(video_name)
+    #             raw_result_csv_path = dir_path / f'fold_{i}' / video_name / f'raw_results_{video_name}.csv'
 
-                analyzer = PredictionCertaintyAnalyzer(save_dir_path=Path("debug_results"), num_classes=6)
-                raw_result = analyzer.load_inference_results(raw_result_csv_path)
+    #             analyzer = PredictionCertaintyAnalyzer(save_dir_path=Path("debug_results"), num_classes=6)
+    #             raw_result = analyzer.load_inference_results(raw_result_csv_path)
 
-                entropies_list = analyzer.analyze_prediction_certainty(raw_result)
+    #             entropies_list = analyzer.analyze_prediction_certainty(raw_result)
 
-                analyzer.visualize_certainty(entropies_list, video_name)
+    #             # analyzer.visualize_certainty(entropies_list, video_name)
 
-                entropy_analyzer = EntropyDistributionAnalyzer(save_dir_path=Path("debug_results/7class"))
-                entropy_analyzed_result = entropy_analyzer.analyze_entropy_distribution(entropies_list, video_name)
+    #             entropy_analyzer = EntropyDistributionAnalyzer(save_dir_path=Path("debug_results/7class"))
+    #             entropy_analyzed_result = entropy_analyzer.analyze_entropy_distribution(entropies_list, video_name)
 
 
 if __name__ == "__main__":

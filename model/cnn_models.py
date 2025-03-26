@@ -9,8 +9,12 @@ class MultiLabelDetectionModel(nn.Module):
         
         self.num_classes = num_classes
         
-        # Initialize ResNet18
-        self.resnet = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None)
+        # Initialize ResNet
+        # self.resnet = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None)
+        self.resnet = models.resnet34(weights=models.ResNet34_Weights.IMAGENET1K_V1 if pretrained else None)
+        # self.resnet = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1 if pretrained else None)
+        # self.resnet = models.resnet101(weights=models.ResNet101_Weights.IMAGENET1K_V1 if pretrained else None)
+        # self.resnet = models.resnet152(weights=models.ResNet152_Weights.IMAGENET1K_V1 if pretrained else None)
         
         # Get the number of features from ResNet
         feature_dim = self.resnet.fc.in_features
@@ -43,7 +47,7 @@ class MultiLabelDetectionModel(nn.Module):
 
 
 class MultiTaskDetectionModel(nn.Module):
-    def __init__(self, num_classes=6, pretrained=False, freeze_backbone=False):
+    def __init__(self, num_classes=6, model_architecture='resnet18', pretrained=False, freeze_backbone=False):
         """
         Args:
             num_classes: 全クラス数（例: 6, 7, 15）
@@ -53,14 +57,36 @@ class MultiTaskDetectionModel(nn.Module):
         super(MultiTaskDetectionModel, self).__init__()
         
         # ResNet18の初期化（pretrainedの場合はImageNetの重みを利用）
-        self.resnet = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None)
-        feature_dim = self.resnet.fc.in_features
-        
-        # 最終層をIdentityに置き換えることで、特徴抽出部分のみを使用
-        self.resnet.fc = nn.Identity()
-        
+        if model_architecture == 'resnet18':
+            self.network = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None)
+            feature_dim = self.network.fc.in_features
+            self.network.fc = nn.Identity()
+        elif model_architecture == 'resnet34':
+            self.network = models.resnet34(weights=models.ResNet34_Weights.IMAGENET1K_V1 if pretrained else None)
+            feature_dim = self.network.fc.in_features
+            self.network.fc = nn.Identity()
+        elif model_architecture == 'resnet50':
+            self.network = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1 if pretrained else None)
+            feature_dim = self.network.fc.in_features
+            self.network.fc = nn.Identity()
+        elif model_architecture == 'resnet101':
+            self.network = models.resnet101(weights=models.ResNet101_Weights.IMAGENET1K_V1 if pretrained else None)
+            feature_dim = self.network.fc.in_features
+            self.network.fc = nn.Identity()
+        elif model_architecture == 'resnet152':
+            self.network = models.resnet152(weights=models.ResNet152_Weights.IMAGENET1K_V1 if pretrained else None)
+            feature_dim = self.network.fc.in_features
+            self.network.fc = nn.Identity()
+        elif model_architecture == 'efficientnet-b0':
+            self.network = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.IMAGENET1K_V1 if pretrained else None)
+            feature_dim = self.network.classifier[1].in_features
+            self.network.classifier = nn.Identity()
+        else:
+            raise ValueError(f"Unsupported model architecture: {model_architecture}")
+
+        # 共通の特徴次元を取得した後の処理
         if freeze_backbone:
-            for param in self.resnet.parameters():
+            for param in self.network.parameters():
                 param.requires_grad = False
         
         # クラス数に応じて出力層を設定
@@ -92,7 +118,7 @@ class MultiTaskDetectionModel(nn.Module):
             - 15クラスの場合: (batch_size, 15)
         """
         # バックボーンによる特徴抽出
-        features = self.resnet(x)  # shape: (batch_size, feature_dim)
+        features = self.network(x)  # shape: (batch_size, feature_dim)
         
         # 主クラスの出力
         main_out = self.main_head(features)

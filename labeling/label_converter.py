@@ -6,7 +6,7 @@ from pathlib import Path
 @dataclass
 class HardMultiLabelResult:
     """
-    マルチラベルの結果をマルチラベルとシングルラベルに変換した結果を格納するクラス。
+    マルチラベルの結果を格納するクラス。
 
     Attributes:
         image_paths: 画像パスのリスト
@@ -48,7 +48,7 @@ class MultiToSingleLabelConverter:
             dict[str, HardMultiLabelResult]: しきい値を超えるラベルのリストを含む辞書。
         """
         hard_multi_labels_results = {}
-        # フォルダごとにマルチラベルをマルチラベルに変換
+        # フォルダごとにマルチソフトラベルをマルチラベルに変換
         for video_name, inference_result in self.inference_results_dict.items():
             hard_multi_label_result = HardMultiLabelResult(image_paths=[], multi_labels=[], ground_truth_labels=[])
             

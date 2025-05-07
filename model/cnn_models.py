@@ -10,8 +10,8 @@ class MultiLabelDetectionModel(nn.Module):
         self.num_classes = num_classes
         
         # Initialize ResNet
-        # self.resnet = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None)
-        self.resnet = models.resnet34(weights=models.ResNet34_Weights.IMAGENET1K_V1 if pretrained else None)
+        self.resnet = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None)
+        # self.resnet = models.resnet34(weights=models.ResNet34_Weights.IMAGENET1K_V1 if pretrained else None)
         # self.resnet = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1 if pretrained else None)
         # self.resnet = models.resnet101(weights=models.ResNet101_Weights.IMAGENET1K_V1 if pretrained else None)
         # self.resnet = models.resnet152(weights=models.ResNet152_Weights.IMAGENET1K_V1 if pretrained else None)

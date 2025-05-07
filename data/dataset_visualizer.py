@@ -6,23 +6,56 @@ import torch
 from torchvision.utils import make_grid
 
 def plot_dataset_samples(save_dir, dataloader):
-    # サンプルを表示し、1つの画像として保存
-    num_samples_to_show = 10
-    fig, axes = plt.subplots(1, num_samples_to_show, figsize=(20, 4))
-
-    for i, (images, img_names, labels) in enumerate(dataloader):
-        if i >= 1:  # 1バッチだけ処理
-            break
-        for j in range(num_samples_to_show):
-            ax = axes[j]
-            img = images[j].permute(1, 2, 0).numpy()  # CHW to HWC, tensor to numpy
-            ax.imshow(img)
-            ax.set_title(f"Label: {labels[j]}")
-            ax.axis('off')
-            print(f"Image path: {img_names[j]}, Label: {labels[j]}")
-
-    plt.tight_layout()
-    plt.savefig(f'{save_dir}/dataset_samples.png')
+    # 全データを収集
+    all_images = []
+    all_labels = []
+    all_names = []
+    
+    for images, img_names, labels in dataloader:
+        all_images.extend(images)
+        all_labels.extend(labels)
+        all_names.extend(img_names)
+    
+    # データをラベルでソート
+    combined = list(zip(all_images, all_labels, all_names))
+    combined.sort(key=lambda x: torch.argmax(x[1]).item())
+    
+    # ソートされたデータを分解
+    sorted_images = [item[0] for item in combined]
+    sorted_labels = [item[1] for item in combined]
+    sorted_names = [item[2] for item in combined]
+    
+    # 20x20のグリッドを作成
+    grid_size = 20
+    total_images = min(grid_size * grid_size, len(sorted_images))
+    
+    fig, axes = plt.subplots(grid_size, grid_size, figsize=(40, 40))
+    plt.subplots_adjust(hspace=0.3, wspace=0.3)
+    
+    for i in range(total_images):
+        row = i // grid_size
+        col = i % grid_size
+        
+        img = sorted_images[i]
+        label = torch.argmax(sorted_labels[i]).item()
+        
+        ax = axes[row, col]
+        img_np = img.permute(1, 2, 0).numpy()  # CHW to HWC
+        ax.imshow(img_np)
+        ax.set_title(f"Label: {label}", fontsize=8)
+        ax.axis('off')
+    
+    # 残りの空のサブプロットを非表示に
+    for i in range(total_images, grid_size * grid_size):
+        row = i // grid_size
+        col = i % grid_size
+        axes[row, col].axis('off')
+    
+    save_path = Path(save_dir) / 'dataset_samples_grid.png'
+    plt.savefig(save_path, bbox_inches='tight', dpi=300)
+    plt.close()
+    
+    print(f"画像をグリッド形式で保存しました: {save_path}")
     
 def show_dataset_stats(dataloader):
     # データセットの総数

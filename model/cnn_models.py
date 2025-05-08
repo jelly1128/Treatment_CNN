@@ -3,46 +3,49 @@ import torch.nn as nn
 import torchvision.models as models
 
 
-class MultiLabelDetectionModel(nn.Module):
-    def __init__(self, num_classes, pretrained=False, freeze_backbone=False):
-        super(MultiLabelDetectionModel, self).__init__()
-        
+class SingleLabelClassificationModel(nn.Module):
+    """
+    シングルラベル分類用のモデル。
+    model_architectureでResNet/EfficientNet等を選択可能。
+    """
+    def __init__(self, num_classes, model_architecture='resnet18', pretrained=False, freeze_backbone=False):
+        super(SingleLabelClassificationModel, self).__init__()
         self.num_classes = num_classes
-        
-        # Initialize ResNet
-        self.resnet = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None)
-        # self.resnet = models.resnet34(weights=models.ResNet34_Weights.IMAGENET1K_V1 if pretrained else None)
-        # self.resnet = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1 if pretrained else None)
-        # self.resnet = models.resnet101(weights=models.ResNet101_Weights.IMAGENET1K_V1 if pretrained else None)
-        # self.resnet = models.resnet152(weights=models.ResNet152_Weights.IMAGENET1K_V1 if pretrained else None)
-        
-        # Get the number of features from ResNet
-        feature_dim = self.resnet.fc.in_features
-        
-        # Remove the final fully connected layer
-        self.resnet.fc = nn.Identity()
-        
-        # Optionally freeze backbone parameters
+        # アーキテクチャごとに初期化
+        if model_architecture == 'resnet18':
+            self.network = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None)
+            feature_dim = self.network.fc.in_features
+            self.network.fc = nn.Identity()
+        elif model_architecture == 'resnet34':
+            self.network = models.resnet34(weights=models.ResNet34_Weights.IMAGENET1K_V1 if pretrained else None)
+            feature_dim = self.network.fc.in_features
+            self.network.fc = nn.Identity()
+        elif model_architecture == 'resnet50':
+            self.network = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1 if pretrained else None)
+            feature_dim = self.network.fc.in_features
+            self.network.fc = nn.Identity()
+        elif model_architecture == 'resnet101':
+            self.network = models.resnet101(weights=models.ResNet101_Weights.IMAGENET1K_V1 if pretrained else None)
+            feature_dim = self.network.fc.in_features
+            self.network.fc = nn.Identity()
+        elif model_architecture == 'resnet152':
+            self.network = models.resnet152(weights=models.ResNet152_Weights.IMAGENET1K_V1 if pretrained else None)
+            feature_dim = self.network.fc.in_features
+            self.network.fc = nn.Identity()
+        elif model_architecture == 'efficientnet-b0':
+            self.network = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.IMAGENET1K_V1 if pretrained else None)
+            feature_dim = self.network.classifier[1].in_features
+            self.network.classifier = nn.Identity()
+        else:
+            raise ValueError(f"Unsupported model architecture: {model_architecture}")
         if freeze_backbone:
-            for param in self.resnet.parameters():
+            for param in self.network.parameters():
                 param.requires_grad = False
-        
-        # Define the output layer
         self.output_layer = nn.Linear(feature_dim, num_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass.
-
-        Args:
-        x: Input tensor of shape (batch_size, n_image, c, h, w)
-
-        Returns:
-        Output tensor of shape (batch_size, num_classes)
-        """
-        features = self.resnet(x)  # (batch_size, num_features)
-        out = self.output_layer(features)  # (batch_size, num_classes)
-
+        features = self.network(x)
+        out = self.output_layer(features)
         return out
 
 

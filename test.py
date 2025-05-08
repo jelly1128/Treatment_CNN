@@ -80,7 +80,7 @@ def test(config: dict,
 
 
     ## 混同行列の計算
-    calculator = ClassificationMetricsCalculator(num_classes=config.test.num_classes)
+    calculator = ClassificationMetricsCalculator(num_classes=config.test.num_classes, mode="multitask")
     video_metrics = calculator.calculate_multi_label_metrics_per_video(hard_multi_label_results)
     overall_metrics = calculator.calculate_multi_label_overall_metrics(hard_multi_label_results)
     ## 各動画フォルダにマルチラベルのメトリクスを保存
@@ -184,7 +184,7 @@ def main():
                 all_folds_all_window_results[window_key][folder_name] = result
 
     # 全foldの結果を集約して評価指標を計算
-    calculator = ClassificationMetricsCalculator(num_classes=config.test.num_classes)
+    calculator = ClassificationMetricsCalculator(num_classes=config.test.num_classes, mode="multitask")
 
     # 各window_sizeの全foldの結果を集約して評価指標を計算
     for window_key, all_window_results in all_folds_all_window_results.items():

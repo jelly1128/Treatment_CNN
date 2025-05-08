@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from engine.inference import InferenceResult
+from labeling.result_types import InferenceResult, SingleLabelResult
 import csv
 from pathlib import Path
 
@@ -17,20 +17,6 @@ class HardMultiLabelResult:
     multi_labels: list[list[int]]
     ground_truth_labels: list[list[int]]
     
-@dataclass
-class SingleLabelResult:
-    """
-    シングルラベルの結果を格納するクラス。
-    
-    Attributes:
-        image_paths: 画像パスのリスト
-        single_labels: シングルラベルの予測ラベルのリスト
-        ground_truth_labels: シングルラベルの正解ラベルのリスト
-    """
-    image_paths: list[str]
-    single_labels: list[int]
-    ground_truth_labels: list[int]
-
 
 class MultiToSingleLabelConverter:
     def __init__(self, inference_results_dict: dict[str, InferenceResult]):

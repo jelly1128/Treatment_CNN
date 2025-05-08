@@ -2,7 +2,7 @@ import torchvision.transforms as transforms
 
 def get_train_transforms():
     return transforms.Compose([
-        transforms.RandomRotation(degrees=360),
+        # transforms.RandomRotation(degrees=360),
         transforms.ToTensor(),
     ])
 

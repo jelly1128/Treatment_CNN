@@ -38,19 +38,24 @@ class Analyzer:
             y_true = np.array(result.ground_truth_labels)[:, :6]  # 主クラスのみ
             num_frames = len(y_pred)
 
-            # 予測ラベルにのみスライディングウィンドウを適用
             smoothed_labels = []
+            center_indices = []
+
             for start in range(0, num_frames - window_size + 1, step):
                 window_pred = y_pred[start:start + window_size]
                 class_counts_pred = window_pred.sum(axis=0)
                 smoothed_label = np.argmax(class_counts_pred)
-                smoothed_labels.append(smoothed_label)
 
-            # 正解ラベルは主クラスの中で1が立っているインデックスを取得
-            true_labels = [np.argmax(label) for label in y_true[:len(smoothed_labels)]]
+                center = start + window_size // 2
+                smoothed_labels.append(smoothed_label)
+                center_indices.append(center)
+
+            # 中心インデックスに対応する画像パスと正解ラベルを取得
+            image_paths_centered = [result.image_paths[i] for i in center_indices]
+            true_labels = [np.argmax(y_true[i]) for i in center_indices]
 
             smoothed_results[folder_name] = SingleLabelResult(
-                image_paths=result.image_paths[:len(smoothed_labels)],
+                image_paths=image_paths_centered,
                 single_labels=smoothed_labels,
                 ground_truth_labels=true_labels
             )

@@ -50,8 +50,8 @@ def train_val(config: dict, train_data_dirs: list, val_data_dirs: list, save_dir
         # マルチラベル用
         train_dataloader, val_dataloader = dataloader_factory.create_multi_label_dataloaders(train_data_dirs, val_data_dirs)
         # 可視化
-        plot_dataset_samples(save_dir, train_dataloader)
-        show_dataset_stats(train_dataloader)
+        # plot_dataset_samples(save_dir, train_dataloader)
+        # show_dataset_stats(train_dataloader)
 
         criterion = nn.BCEWithLogitsLoss()
         is_multilabel = True

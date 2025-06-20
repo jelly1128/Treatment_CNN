@@ -11,7 +11,7 @@ training:
   
 paths:
   dataset_root: '/home/tanaka/demo_data'
-  save_dir: '6class_resnet18_no_rotation_multitask_train'
+  save_dir: '6class_resnet18_360_rotation_multitask_train'
 
 splits:
   split1:

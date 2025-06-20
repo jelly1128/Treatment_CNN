@@ -2,7 +2,7 @@ training:
   img_size: 224
   num_classes: 15
   model_architecture: 'resnet18'
-  model_type: 'single_label'
+  model_type: 'multitask'
   pretrained: True
   freeze_backbone: False
   learning_rate: 1e-4
@@ -11,7 +11,7 @@ training:
   
 paths:
   dataset_root: '/home/tanaka/demo_data'
-  save_dir: 'single_class_resnet18_train'
+  save_dir: '15class_resnet18_360_rotation_multitask_train'
 
 splits:
   split1:

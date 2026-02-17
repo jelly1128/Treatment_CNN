@@ -2,15 +2,15 @@ import argparse
 import logging
 from pathlib import Path
 
-from analyze.window_key import WindowSizeKey
+
 from config.config_loader import load_test_config
 from data.data_splitter import CrossValidationSplitter
 from data.dataloader import DataLoaderFactory
-from data.dataset_visualizer import plot_dataset_samples, show_dataset_stats
 from engine.inference import Inference
 from evaluate.analyzer import Analyzer
 from utils.torch_utils import get_device_and_num_gpus, set_seed
 from utils.logger import setup_logging
+from utils.window_key import WindowSizeKey
 from evaluate.results_visualizer import ResultsVisualizer
 from labeling.label_converter import MultiToSingleLabelConverter
 from evaluate.metrics import ClassificationMetricsCalculator
@@ -51,11 +51,13 @@ def test(config: dict,
     test_dataloaders = dataloader_factory.create_multi_label_test_dataloaders(test_data_dirs)
     
     # モデルのセットアップ
-    model = setup_model(config=config, 
-                        device=device, 
-                        num_gpus=num_gpus, 
-                        mode='test', 
-                        model_path=model_path)
+    model = setup_model(
+        config=config, 
+        device=device, 
+        num_gpus=num_gpus, 
+        mode='test', 
+        model_path=model_path
+    )
     
     # 推論
     inference = Inference(model, device)
@@ -78,7 +80,7 @@ def test(config: dict,
 
 
     ## 混同行列の計算
-    calculator = ClassificationMetricsCalculator(num_classes=6)
+    calculator = ClassificationMetricsCalculator(num_classes=config.test.num_classes, mode="multitask")
     video_metrics = calculator.calculate_multi_label_metrics_per_video(hard_multi_label_results)
     overall_metrics = calculator.calculate_multi_label_overall_metrics(hard_multi_label_results)
     ## 各動画フォルダにマルチラベルのメトリクスを保存
@@ -182,7 +184,7 @@ def main():
                 all_folds_all_window_results[window_key][folder_name] = result
 
     # 全foldの結果を集約して評価指標を計算
-    calculator = ClassificationMetricsCalculator(num_classes=6)
+    calculator = ClassificationMetricsCalculator(num_classes=config.test.num_classes, mode="multitask")
 
     # 各window_sizeの全foldの結果を集約して評価指標を計算
     for window_key, all_window_results in all_folds_all_window_results.items():

@@ -5,9 +5,15 @@ import pandas as pd
 from pathlib import Path
 
 class ClassificationMetricsCalculator:
-    def __init__(self, num_classes: int = 15):
+    def __init__(self, num_classes: int = 15, mode: str = "multitask"):
+        """
+        Args:
+            num_classes (int or None): クラス数。Noneの場合はmodeに応じて自動設定。
+            mode (str): "multitask"（マルチラベル/マルチタスク）または "single_label"（シングルラベル）
+        """
         self.num_classes = num_classes
-    
+        self.mode = mode
+        
     def calculate_metrics_multi_label_per_class(self, y_true, y_pred):
         """
         各クラスごとのTP, FP, TN, FNを計算
@@ -72,7 +78,11 @@ class ClassificationMetricsCalculator:
         y_pred = np.array(y_pred)
         
         # クラス数×クラス数の混同行列を計算
-        n_classes = 6  # 主クラスの数
+        # modeに応じてクラス数を設定
+        if self.mode == "multitask":
+            n_classes = 6  # 主クラスの数
+        elif self.mode == "single_label":
+            n_classes = 5
         confusion_matrix = np.zeros((n_classes, n_classes), dtype=int)
         
         # 混同行列を作成
@@ -255,7 +265,11 @@ class ClassificationMetricsCalculator:
         y_pred = np.array(y_pred)
 
         # クラス数×クラス数の混同行列を計算
-        n_classes = 6  # 主クラスの数
+        # modeに応じてクラス数を設定
+        if self.mode == "multitask":
+            n_classes = 6  # 主クラスの数
+        elif self.mode == "single_label":
+            n_classes = 5
         class_confusion_matrix = np.zeros((n_classes, n_classes), dtype=int)
         
         # 混同行列を作成
@@ -317,7 +331,11 @@ class ClassificationMetricsCalculator:
         y_pred = np.array(y_pred)
 
         # クラス数×クラス数の混同行列を計算
-        n_classes = 6  # 主クラスの数
+        # modeに応じてクラス数を設定
+        if self.mode == "multitask":
+            n_classes = 6  # 主クラスの数
+        elif self.mode == "single_label":
+            n_classes = 5
         class_confusion_matrix = np.zeros((n_classes, n_classes), dtype=int)
         
         # 混同行列を作成
@@ -373,6 +391,5 @@ class ClassificationMetricsCalculator:
             'class_metrics': class_metrics,
             'class_confusion_matrix': class_confusion_matrix,
         }
-            
-    
-    
+
+

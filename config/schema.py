@@ -14,6 +14,7 @@ class TrainingConfig(BaseModel):
 class TestConfig(BaseModel):
     img_size: int
     num_classes: int
+    model_architecture: str
     model_type: str
 
 class PathConfig(BaseModel):

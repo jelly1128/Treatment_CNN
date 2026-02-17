@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 import matplotlib.pyplot as plt
 from collections import Counter
@@ -6,23 +6,56 @@ import torch
 from torchvision.utils import make_grid
 
 def plot_dataset_samples(save_dir, dataloader):
-    # サンプルを表示し、1つの画像として保存
-    num_samples_to_show = 10
-    fig, axes = plt.subplots(1, num_samples_to_show, figsize=(20, 4))
-
-    for i, (images, img_names, labels) in enumerate(dataloader):
-        if i >= 1:  # 1バッチだけ処理
-            break
-        for j in range(num_samples_to_show):
-            ax = axes[j]
-            img = images[j].permute(1, 2, 0).numpy()  # CHW to HWC, tensor to numpy
-            ax.imshow(img)
-            ax.set_title(f"Label: {labels[j]}")
-            ax.axis('off')
-            print(f"Image path: {img_names[j]}, Label: {labels[j]}")
-
-    plt.tight_layout()
-    plt.savefig(f'{save_dir}/dataset_samples.png')
+    # 全データを収集
+    all_images = []
+    all_labels = []
+    all_names = []
+    
+    for images, img_names, labels in dataloader:
+        all_images.extend(images)
+        all_labels.extend(labels)
+        all_names.extend(img_names)
+    
+    # データをラベルでソート
+    combined = list(zip(all_images, all_labels, all_names))
+    combined.sort(key=lambda x: torch.argmax(x[1]).item())
+    
+    # ソートされたデータを分解
+    sorted_images = [item[0] for item in combined]
+    sorted_labels = [item[1] for item in combined]
+    sorted_names = [item[2] for item in combined]
+    
+    # 20x20のグリッドを作成
+    grid_size = 20
+    total_images = min(grid_size * grid_size, len(sorted_images))
+    
+    fig, axes = plt.subplots(grid_size, grid_size, figsize=(40, 40))
+    plt.subplots_adjust(hspace=0.3, wspace=0.3)
+    
+    for i in range(total_images):
+        row = i // grid_size
+        col = i % grid_size
+        
+        img = sorted_images[i]
+        label = torch.argmax(sorted_labels[i]).item()
+        
+        ax = axes[row, col]
+        img_np = img.permute(1, 2, 0).numpy()  # CHW to HWC
+        ax.imshow(img_np)
+        ax.set_title(f"Label: {label}", fontsize=8)
+        ax.axis('off')
+    
+    # 残りの空のサブプロットを非表示に
+    for i in range(total_images, grid_size * grid_size):
+        row = i // grid_size
+        col = i % grid_size
+        axes[row, col].axis('off')
+    
+    save_path = Path(save_dir) / 'dataset_samples_grid.png'
+    plt.savefig(save_path, bbox_inches='tight', dpi=300)
+    plt.close()
+    
+    print(f"画像をグリッド形式で保存しました: {save_path}")
     
 def show_dataset_stats(dataloader):
     # データセットの総数
@@ -53,8 +86,7 @@ def show_dataset_stats(dataloader):
         
         
 def visualize_dataset(dataset, output_dir, num_samples=500):
-    os.makedirs(output_dir, exist_ok=True)
-    
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
     for i in range(0, len(dataset), 100):
         images_list = []
         labels_list = []
@@ -77,62 +109,74 @@ def visualize_dataset(dataset, output_dir, num_samples=500):
         draw.text((10, 10), f"Labels: {label_text}", fill=(255, 255, 255), font=font)
         
         # 画像を保存
-        output_path = os.path.join(output_dir, f"sample_{i//100}.png")
+        output_path = Path(output_path) / f"sample_{i//100}.png"
         pil_image.save(output_path)
         
         print(f"Saved image with labels {label_text} to {output_path}")
-        
 
-def visualize_multi_label_timeline(df, save_dir, filename, num_classes):
-    # Define the colors for each class
-    label_colors = {
-        0: (254, 195, 195),       # white
-        1: (204, 66, 38),         # lugol
-        2: (57, 103, 177),        # indigo
-        3: (96, 165, 53),         # nbi
-        4: (86, 65, 72),          # outside
-        5: (159, 190, 183),       # bucket
-    }
-
-    # Default color for labels not specified in label_colors
-    default_color = (148, 148, 148)
-
-    # Extract the predicted labels columns
-    predicted_labels = df[[col for col in df.columns if 'Predicted' in col]].values
-
-    # Determine the number of images
-    n_images = len(predicted_labels)
+def plot_dataset_samples_singlelabel(save_dir, dataloader):
+    # 全データを収集
+    all_images = []
+    all_labels = []
+    all_names = []
     
-    # Set timeline height based on the number of labels
-    timeline_width = n_images
-    timeline_height = num_classes * (n_images // 10)
+    for images, img_names, labels in dataloader:
+        all_images.extend(images)
+        all_labels.extend(labels)
+        all_names.extend(img_names)
+    
+    # データをラベルでソート
+    combined = list(zip(all_images, all_labels, all_names))
+    combined.sort(key=lambda x: int(x[1]) if not isinstance(x[1], torch.Tensor) else int(x[1].item()))
+    
+    # ソートされたデータを分解
+    sorted_images = [item[0] for item in combined]
+    sorted_labels = [item[1] for item in combined]
+    sorted_names = [item[2] for item in combined]
+    
+    # 20x20のグリッドを作成
+    grid_size = 20
+    total_images = min(grid_size * grid_size, len(sorted_images))
+    
+    fig, axes = plt.subplots(grid_size, grid_size, figsize=(40, 40))
+    plt.subplots_adjust(hspace=0.3, wspace=0.3)
+    
+    for i in range(total_images):
+        row = i // grid_size
+        col = i % grid_size
+        img = sorted_images[i]
+        label = int(sorted_labels[i]) if not isinstance(sorted_labels[i], torch.Tensor) else int(sorted_labels[i].item())
+        ax = axes[row, col]
+        img_np = img.permute(1, 2, 0).numpy()  # CHW to HWC
+        ax.imshow(img_np)
+        ax.set_title(f"Label: {label}", fontsize=8)
+        ax.axis('off')
+    
+    # 残りの空のサブプロットを非表示に
+    for i in range(total_images, grid_size * grid_size):
+        row = i // grid_size
+        col = i % grid_size
+        axes[row, col].axis('off')
+    
+    save_path = Path(save_dir) / 'dataset_samples_grid_singlelabel.png'
+    plt.savefig(save_path, bbox_inches='tight', dpi=300)
+    plt.close()
+    
+    print(f"画像をグリッド形式で保存しました: {save_path}")
 
-    # Create a blank image for the timeline
-    timeline_image = Image.new('RGB', (timeline_width, timeline_height), (255, 255, 255))
-    draw = ImageDraw.Draw(timeline_image)
-
-    # Iterate over each image (row in the CSV)
-    for i in range(n_images):
-        # Get the predicted labels for the current image
-        labels = predicted_labels[i]
-        
-        # Check each label and draw corresponding rectangles
-        for label_idx, label_value in enumerate(labels):
-            if label_value == 1:
-                row_idx = label_idx
-
-                # Calculate the position in the timeline
-                x1 = i * (timeline_width // n_images)
-                x2 = (i + 1) * (timeline_width // n_images)
-                y1 = row_idx * (n_images // 10)
-                y2 = (row_idx + 1) * (n_images // 10)
-                
-                # Get the color for the current label
-                color = label_colors.get(label_idx, default_color)
-                
-                # Draw the rectangle for the label
-                draw.rectangle([x1, y1, x2, y2], fill=color)
-                
-    # Save the image
-    timeline_image.save(os.path.join(save_dir, f'{filename}_multi_label_timeline.png'))
-    print(f'Timeline image saved at {os.path.join(save_dir, "multi_label_timeline.png")}')
+def show_dataset_stats_singlelabel(dataloader):
+    # データセットの総数
+    total_samples = len(dataloader.dataset)
+    # ラベルの分布を計算
+    all_labels = []
+    for batch, (images, _, labels) in enumerate(dataloader):
+        if isinstance(labels, torch.Tensor):
+            all_labels.extend(labels.cpu().tolist())
+        else:
+            all_labels.extend(labels)
+    # クラスごとのサンプル数をカウント
+    class_samples = Counter(all_labels)
+    print(f"総サンプル数: {total_samples}")
+    print("クラスごとのサンプル数:")
+    for class_label, count in sorted(class_samples.items()):
+        print(f"クラス {class_label}: {count}")

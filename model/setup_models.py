@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
-from .cnn_models import MultiLabelDetectionModel, MultiTaskDetectionModel, AnomalyDetectionModel
+from .cnn_models import MultiTaskDetectionModel, SingleLabelClassificationModel
+
+
 def setup_model(config, device, num_gpus, mode='train', model_path=None):
     """
     モデルをセットアップし、GPUに移動し、並列化する。
@@ -17,20 +19,22 @@ def setup_model(config, device, num_gpus, mode='train', model_path=None):
     """
     # モデルの初期化
     model_type = config.training.model_type if mode == 'train' else config.test.model_type
-    if model_type  == 'multi_label':
-        model = MultiLabelDetectionModel(
-            num_classes=config.training.num_classes if mode == 'train' else config.test.num_classes,  # テスト時はnum_classes=config.testing.num_classes
-        pretrained=config.training.pretrained if mode == 'train' else False,                          # テスト時はpretrained=False
-        freeze_backbone=config.training.freeze_backbone if mode == 'train' else False                 # テスト時はfreeze_backbone=False
-    )
+    if model_type == 'single_label':
+        model = SingleLabelClassificationModel(
+            num_classes=config.training.num_classes if mode == 'train' else config.test.num_classes,                        # テスト時はconfig.test.num_classesを使用       
+            model_architecture=config.training.model_architecture if mode == 'train' else config.test.model_architecture,   # テスト時はconfig.test.num_classesを使用       
+            pretrained=config.training.pretrained if mode == 'train' else False,                                            # テスト時はFalseを使用
+            freeze_backbone=config.training.freeze_backbone if mode == 'train' else False                                   # テスト時はFalseを使用
+        )
     elif model_type == 'multitask':
         model = MultiTaskDetectionModel(
-            num_classes=config.training.num_classes if mode == 'train' else config.test.num_classes,  # テスト時はnum_classes=config.testing.num_classes
-            pretrained=config.training.pretrained if mode == 'train' else False,                      # テスト時はpretrained=False
-            freeze_backbone=config.training.freeze_backbone if mode == 'train' else False             # テスト時はfreeze_backbone=False
+            num_classes=config.training.num_classes if mode == 'train' else config.test.num_classes,                        # テスト時はconfig.test.num_classesを使用       
+            model_architecture=config.training.model_architecture if mode == 'train' else config.test.model_architecture,   # テスト時はconfig.test.num_classesを使用       
+            pretrained=config.training.pretrained if mode == 'train' else False,                                            # テスト時はFalseを使用
+            freeze_backbone=config.training.freeze_backbone if mode == 'train' else False                                   # テスト時はFalseを使用
         )
     else:
-        raise ValueError(f"Invalid model type: {config.training.model_type}")
+        raise ValueError(f"Invalid model type: {model_type}")
 
     # テスト時は学習済みの重みを読み込む
     if mode == 'test':

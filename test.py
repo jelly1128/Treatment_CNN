@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 
 
-from config.config_loader import load_test_config
+from config.config_loader import load_experiment_config
 from data.data_splitter import CrossValidationSplitter
 from data.dataloader import DataLoaderFactory
 from engine.inference import Inference
@@ -129,13 +129,17 @@ def test(config: dict,
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Multi-class organ classification model using ResNet')
-    parser.add_argument('-c', '--config', help='Path to config file', default='config.yaml')
+    parser.add_argument('-c', '--config', type=Path, help='Path to config file', default='config.yaml')
     return parser.parse_args()
 
 def main():
     # 引数の解析
     args = parse_args()
-    config = load_test_config(args.config)
+    config = load_experiment_config(args.config)
+    # debug
+    print(config)
+    import sys
+    sys.exit()
     
     # 結果保存フォルダを作成
     Path(config.paths.save_dir).mkdir(exist_ok=True)

@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from config.config_loader import load_train_config
+from config.config_loader import load_experiment_config
 from data.data_splitter import CrossValidationSplitter
 from data.dataloader import DataLoaderFactory
 from data.dataset_visualizer import plot_dataset_samples, show_dataset_stats, plot_dataset_samples_singlelabel, show_dataset_stats_singlelabel
@@ -94,16 +94,20 @@ def train_val(config: dict, train_data_dirs: list, val_data_dirs: list, save_dir
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str, help='Path to config file', default='config.yaml')
+    parser.add_argument('-c', '--config', type=Path, help='Path to config file', default='config.yaml')
     parser.add_argument('-f', '--fold', type=int, help='Fold number to train (optional, if not set, trains all folds)')
-    parser.add_argument('-a', '--class_num', type=int, help='Number of classes to train (optional, if not set, uses the number of classes in the config file)')
     return parser.parse_args()
 
 
 def main():
     # 設定読み込み
     args = parse_args()
-    config = load_train_config(args.config)
+    config = load_experiment_config(args.config)
+    # debug
+    print(config)
+    import sys
+    sys.exit()
+    #config = load_train_config(args.config)
 
     # 結果保存フォルダを作成
     Path(config.paths.save_dir).mkdir(exist_ok=True)
@@ -113,10 +117,10 @@ def main():
     split_folders = splitter.get_split_folders()
 
     # debug
-    # splits = splitter.get_fold_splits()
-    # print(splits)
-    # import sys
-    # sys.exit()
+    splits = splitter.get_fold_splits()
+    print(splits)
+    import sys
+    sys.exit()
 
     # --fold 引数が指定された場合は、そのfoldのみ学習
     if args.fold is not None:

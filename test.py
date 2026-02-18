@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 from config.config_loader import load_experiment_config
-from data.data_splitter import CrossValidationSplitter
+from data.data_splitter import CVSplitter, print_fold_summary
 from data.dataloader import DataLoaderFactory
 from engine.inference import Inference
 from evaluate.analyzer import Analyzer
@@ -136,17 +136,20 @@ def main():
     # 引数の解析
     args = parse_args()
     config = load_experiment_config(args.config)
-    # debug
-    print(config)
-    import sys
-    sys.exit()
     
     # 結果保存フォルダを作成
     Path(config.paths.save_dir).mkdir(exist_ok=True)
     
-    # dataloaderの作成
-    splitter = CrossValidationSplitter(splits=config.splits.root)
-    split_folders = splitter.get_split_folders()
+    # 交差検証のためのデータ分割
+    splitter = CVSplitter(config.cv_splits.root, 
+                          train_ratio=config.cv_ratio.train, 
+                          val_ratio=config.cv_ratio.val, 
+                          test_ratio=config.cv_ratio.test
+                          )
+    # デバッグ用：分割結果の確認
+    print_fold_summary(splitter)
+    import sys
+    sys.exit()
         
     # 全foldの結果を保存する辞書
     all_folds_hard_multi_label_results = {}

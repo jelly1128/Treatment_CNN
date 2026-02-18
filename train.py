@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 from config.config_loader import load_experiment_config
-from data.data_splitter import CrossValidationSplitter
+from data.data_splitter import CVSplitter, print_fold_summary
 from data.dataloader import DataLoaderFactory
 from data.dataset_visualizer import plot_dataset_samples, show_dataset_stats, plot_dataset_samples_singlelabel, show_dataset_stats_singlelabel
 from utils.torch_utils import get_device_and_num_gpus, set_seed
@@ -103,22 +103,18 @@ def main():
     # 設定読み込み
     args = parse_args()
     config = load_experiment_config(args.config)
-    # debug
-    print(config)
-    import sys
-    sys.exit()
-    #config = load_train_config(args.config)
 
     # 結果保存フォルダを作成
     Path(config.paths.save_dir).mkdir(exist_ok=True)
 
     # 交差検証のためのデータ分割
-    splitter = CrossValidationSplitter(splits=config.splits.root)
-    split_folders = splitter.get_split_folders()
-
-    # debug
-    splits = splitter.get_fold_splits()
-    print(splits)
+    splitter = CVSplitter(config.cv_splits.root, 
+                          train_ratio=config.cv_ratio.train, 
+                          val_ratio=config.cv_ratio.val, 
+                          test_ratio=config.cv_ratio.test
+                          )
+    # デバッグ用：分割結果の確認
+    print_fold_summary(splitter)
     import sys
     sys.exit()
 

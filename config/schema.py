@@ -1,9 +1,8 @@
 from enum import Enum
-from pathlib import Path
 import torch.nn as nn
 
 from typing import Literal
-from pydantic import BaseModel, RootModel
+from pydantic import BaseModel, RootModel, model_validator
 
 
 # ──────────────────────────────────────────
@@ -72,6 +71,24 @@ class ExperimentPaths(BaseModel):
     save_dir: str
     model_paths: list[str] | None = None   # 学習済みモデルのパスリスト（テスト用）
     
+class CVRatioConfig(BaseModel):
+    """交差検証の分割比率を保持するデータクラス"""
+    train: int
+    val: int
+    test: int
+
+    @model_validator(mode='after')
+    def validate_ratios(cls, config):
+        total = config.train + config.val + config.test
+        if total <= 0:
+            raise ValueError("Total of train, val, and test ratios must be greater than 0")
+        return config
+    
+    @property
+    def total(self) -> int:
+        return self.train + self.val + self.test
+
+
 class CVSplitsConfig(RootModel[dict[str, list[str]]]):
     """
     交差検証の分割設定．
@@ -96,5 +113,6 @@ class ExperimentConfig(BaseModel):
     model: ModelConfig
     dataset: DatasetConfig
     paths: ExperimentPaths
+    cv_ratio: CVRatioConfig
     cv_splits: CVSplitsConfig
     training: TrainingConfig | None = None  # トレーニング設定（テストモードでは不要）

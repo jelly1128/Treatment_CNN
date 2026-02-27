@@ -1,32 +1,129 @@
-from pydantic import BaseModel, RootModel
+from enum import Enum
+from pathlib import Path
+import torch.nn as nn
+
+from typing import Literal
+from pydantic import BaseModel, RootModel, model_validator
+
+
+# ──────────────────────────────────────────
+# Enum 定義
+# ──────────────────────────────────────────
+
+class ModelArchitecture(str, Enum):
+    """
+    使用可能なモデルのアーキテクチャを表す列挙型
+    
+    追加方法：
+    1. 新しいモデルアーキテクチャをこの列挙型に追加
+    2. cnn_models.py 内の MODEL_ARCHITECTURES 辞書に新しいモデルのクラスを追加
+    """
+    RESNET18 = 'resnet18'
+    RESNET34 = 'resnet34'
+    RESNET50 = 'resnet50'
+
+
+class ModelType(str, Enum):
+    """
+    モデルのタイプを表す列挙型
+    
+    追加方法：
+    1. 新しいモデルタイプをこの列挙型に追加
+    2. cnn_models.py 内の MODEL_TYPES 辞書に新しいモデルタイプのクラスを追加
+    """
+    MULTITASK    = "multitask"     # マルチラベル分類（BCEWithLogitsLoss）
+    SINGLE_LABEL = "single_label"  # シングルラベル分類（CrossEntropyLoss）
+
+    @property
+    def criterion(self):
+        """モデルタイプに対応する損失関数を返す"""
+        match self:
+            case ModelType.MULTITASK:
+                return nn.BCEWithLogitsLoss()
+            case ModelType.SINGLE_LABEL:
+                return nn.CrossEntropyLoss()
+
+# ──────────────────────────────────────────
+# サブ設定クラス
+# ──────────────────────────────────────────
+class ModelConfig(BaseModel):
+    """train / test で共通のモデル設定"""
+    architecture: ModelArchitecture
+    type: ModelType
+    num_classes: int
+
+class DatasetConfig(BaseModel):
+    """データセットに関する設定を保持するデータクラス"""
+    root: str
+    img_size: int
+    batch_size: int
 
 class TrainingConfig(BaseModel):
-    img_size: int
-    num_classes: int
-    model_architecture: str
-    model_type: str
+    """モデルのトレーニングに関する設定を保持するデータクラス"""
     pretrained: bool
     freeze_backbone: bool
     learning_rate: float
-    batch_size: int
     max_epochs: int
 
-class TestConfig(BaseModel):
-    img_size: int
-    num_classes: int
-    model_architecture: str
-    model_type: str
-
-class PathConfig(BaseModel):
-    dataset_root: str
+class ExperimentPaths(BaseModel):
+    """
+    入出力パスに関する設定を保持するデータクラス
+    """
     save_dir: str
-    model_paths: list[str] | None = None
+    model_paths: list[str] | None = None   # 学習済みモデルのパスリスト（テスト用）
+
+    @property
+    def save_dir_path(self) -> Path:
+        return Path(self.save_dir)
+
+    @property
+    def model_paths_as_path(self) -> list[Path] | None:
+        if self.model_paths is None:
+            return None
+        return [Path(p) for p in self.model_paths]
     
-class SplitConfig(RootModel[dict[str, list[str]]]):
+class CVRatioConfig(BaseModel):
+    """交差検証の分割比率を保持するデータクラス"""
+    train: int
+    val: int
+    test: int
+
+    @model_validator(mode='after')
+    def validate_ratios(cls, config):
+        total = config.train + config.val + config.test
+        if total <= 0:
+            raise ValueError("Total of train, val, and test ratios must be greater than 0")
+        return config
+    
+    @property
+    def total(self) -> int:
+        return self.train + self.val + self.test
+
+
+class CVSplitsConfig(RootModel[dict[str, list[str]]]):
+    """
+    交差検証の分割設定．
+
+    YAML 構造:
+        splits:
+          split1: [video_dir_a, video_dir_b, ...]
+          split2: [video_dir_c, ...]
+    """
     pass
 
-class Config(BaseModel):
-    training: TrainingConfig | None = None
-    test: TestConfig | None = None
-    paths: PathConfig
-    splits: SplitConfig | None = None
+
+# ──────────────────────────────────────────
+# 全体の設定クラス
+# ──────────────────────────────────────────
+
+class ExperimentConfig(BaseModel):
+    """
+    実験全体の設定を保持するデータクラス
+    """
+    mode: Literal['train', 'test']
+    model: ModelConfig
+    dataset: DatasetConfig
+    paths: ExperimentPaths
+    cv_ratio: CVRatioConfig
+    cv_splits: CVSplitsConfig
+    training: TrainingConfig | None = None  # トレーニング設定（テストモードでは不要）

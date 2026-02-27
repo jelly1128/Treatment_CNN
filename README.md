@@ -12,9 +12,6 @@
 ## ディレクトリ構造
 ```
 Treatment_CNN/
-├── analyze/                  # 解析関連のモジュール
-│   ├── window_key.py         # スライディングウィンドウのキー管理
-│   └── analyzer.py           # 結果解析の実装
 ├── config/                   # 設定ファイル
 │   ├── config_loader.py      # 設定ファイル読み込み
 │   ├── schema.py             # 設定のスキーマ定義
@@ -113,22 +110,27 @@ python test.py -c config/test_config.yaml
 `config/train_config.yaml`で学習時の設定を指定できます：
 
 ```yaml
-training:
-  img_size: 224                    # 画像サイズ
-  num_classes: 6                   # クラス数
-  model_architecture: 'resnet18'   # モデルアーキテクチャ
-  model_type: 'multitask'          # モデルタイプ
-  pretrained: True                 # 事前学習済みモデルの使用
-  freeze_backbone: False           # バックボーンのフリーズ
-  learning_rate: 1e-4              # 学習率
-  batch_size: 16                   # バッチサイズ
-  max_epochs: 10                   # 最大エポック数
+mode: train
+model:
+  architecture: 'resnet18'
+  type: 'multitask'
+  num_classes: 6
+
+dataset:
+  root: '/dataset'
+  img_size: 224
+  batch_size: 16
 
 paths:
-  dataset_root: '../data'  # データセットのルートパス
-  save_dir: '../results'           # 保存ディレクトリ
+  save_dir: '/train_output_dir'
 
-splits:                            # 交差検証用のデータ分割
+training:
+  pretrained: True
+  freeze_backbone: False
+  learning_rate: 1e-4
+  max_epochs: 10
+
+cv_splits:                           # 交差検証用のデータ分割
   split1:
     - video_data1
     - video_data2
@@ -138,6 +140,29 @@ splits:                            # 交差検証用のデータ分割
     - video_data4
     - ...
 ```
+
+`config/test_config.yaml`でテスト時の設定を指定できます：
+
+```yaml
+mode: test
+model:
+  architecture: 'resnet18'
+  type: 'multitask'
+  num_classes: 6
+
+dataset:
+  root: '/dataset_path'
+  img_size: 224
+  batch_size: 1
+
+paths:
+  save_dir: 'test_output_dir'
+  model_paths:
+    - '/train_output_dir/fold_0/best_model.pth'
+    - '/train_output_dir/fold_1/best_model.pth'
+    - '/train_output_dir/fold_1/best_model.pth'
+    - '/train_output_dir/fold_2/best_model.pth'
+
 
 ## 評価指標
 - Accuracy
@@ -150,7 +175,3 @@ splits:                            # 交差検証用のデータ分割
 - クラスごとの精度指標
 - 時系列での予測可視化（SVG形式）
 - スライディングウィンドウごとの性能比較
-
-## 注意事項
-- データセットは含まれていません
-- 

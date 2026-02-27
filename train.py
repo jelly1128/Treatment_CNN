@@ -1,159 +1,177 @@
 import argparse
-import logging
+# import logging
 from pathlib import Path
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
+# import torch
+# import torch.nn as nn
+# import torch.optim as optim
 
-from config.config_loader import load_train_config
-from data.data_splitter import CrossValidationSplitter
-from data.dataloader import DataLoaderFactory
-from data.dataset_visualizer import plot_dataset_samples, show_dataset_stats, plot_dataset_samples_singlelabel, show_dataset_stats_singlelabel
-from utils.torch_utils import get_device_and_num_gpus, set_seed
-from utils.logger import setup_logging
-from utils.training_monitor import TrainingMonitor
-from engine.trainer import Trainer
-from engine.validator import Validator
-from model.setup_models import setup_model
+from config.config_loader import load_experiment_config
+from engine.runner import CVRunner
+# from data.data_splitter import CVSplitter, print_fold_summary
+# from data.dataloader import DataLoaderFactory
+# from data.dataset_visualizer import plot_dataset_samples, show_dataset_stats, plot_dataset_samples_singlelabel, show_dataset_stats_singlelabel
+# from utils.torch_utils import get_device_and_num_gpus, set_seed
+# from utils.logger import setup_logging
+# from utils.training_monitor import TrainingMonitor
+# from engine.trainer import Trainer
+# from engine.validator import Validator
+# from model.setup_models import setup_model
 
 
-def train_val(config: dict, train_data_dirs: list, val_data_dirs: list, save_dir: str, logger: logging.Logger):
-    # setup
-    device, num_gpus = get_device_and_num_gpus()
-    set_seed(42)
+# def train_val(config: dict, train_data_dirs: list, val_data_dirs: list, save_dir: str, logger: logging.Logger):
+#     # setup
+#     device, num_gpus = get_device_and_num_gpus()
+#     set_seed(42)
 
-    # データローダーの作成
-    dataloader_factory = DataLoaderFactory(
-        dataset_root=config.paths.dataset_root,
-        batch_size=config.training.batch_size,
-        num_classes=config.training.num_classes,
-        num_gpus=num_gpus
-    )
+#     # データローダーの作成
+#     dataloader_factory = DataLoaderFactory(
+#         dataset_root=config.paths.dataset_root,
+#         batch_size=config.training.batch_size,
+#         num_classes=config.training.num_classes,
+#         num_gpus=num_gpus
+#     )
 
-    model_type = getattr(config.training, 'model_type', 'multitask')
+#     model_type = getattr(config.training, 'model_type', 'multitask')
 
-    if model_type == 'single_label':
-        # シングルラベル用
-        merge_label_indices = [4, 5, 6, 11, 12]
-        merge_to_label = 4
-        train_dataloader, val_dataloader = dataloader_factory.create_single_label_dataloaders(
-            train_data_dirs, val_data_dirs, merge_label_indices, merge_to_label=merge_to_label
-        )
-        # 可視化
-        # plot_dataset_samples_singlelabel(save_dir, train_dataloader)
-        # show_dataset_stats_singlelabel(train_dataloader)
-        # show_dataset_stats_singlelabel(val_dataloader)
-        criterion = nn.CrossEntropyLoss()
-        is_multilabel = False
-    else:
-        # マルチラベル用
-        train_dataloader, val_dataloader = dataloader_factory.create_multi_label_dataloaders(train_data_dirs, val_data_dirs)
-        # 可視化
-        # plot_dataset_samples(save_dir, train_dataloader)
-        # show_dataset_stats(train_dataloader)
+#     if model_type == 'single_label':
+#         # シングルラベル用
+#         merge_label_indices = [4, 5, 6, 11, 12]
+#         merge_to_label = 4
+#         train_dataloader, val_dataloader = dataloader_factory.create_single_label_dataloaders(
+#             train_data_dirs, val_data_dirs, merge_label_indices, merge_to_label=merge_to_label
+#         )
+#         # 可視化
+#         # plot_dataset_samples_singlelabel(save_dir, train_dataloader)
+#         # show_dataset_stats_singlelabel(train_dataloader)
+#         # show_dataset_stats_singlelabel(val_dataloader)
+#         criterion = nn.CrossEntropyLoss()
+#         is_multilabel = False
+#     else:
+#         # マルチラベル用
+#         train_dataloader, val_dataloader = dataloader_factory.create_multi_label_dataloaders(train_data_dirs, val_data_dirs)
+#         # 可視化
+#         # plot_dataset_samples(save_dir, train_dataloader)
+#         # show_dataset_stats(train_dataloader)
 
-        criterion = nn.BCEWithLogitsLoss()
-        is_multilabel = True
+#         criterion = nn.BCEWithLogitsLoss()
+#         is_multilabel = True
 
-    # モデルのセットアップ
-    model = setup_model(config, device, num_gpus, mode='train')
-    optimizer = optim.Adam(model.parameters(), lr=float(config.training.learning_rate))
+#     # モデルのセットアップ
+#     model = setup_model(config, device, num_gpus, mode='train')
+#     optimizer = optim.Adam(model.parameters(), lr=float(config.training.learning_rate))
 
-    # 学習の経過を保存
-    loss_history = {'train': [], 'val': []}
-    monitor = TrainingMonitor(save_dir)
+#     # 学習の経過を保存
+#     loss_history = {'train': [], 'val': []}
+#     monitor = TrainingMonitor(save_dir)
 
-    # 学習・検証エンジン
-    trainer = Trainer(model, optimizer, criterion, device, is_multilabel=is_multilabel)
-    validator = Validator(model, criterion, device, is_multilabel=is_multilabel)
+#     # 学習・検証エンジン
+#     trainer = Trainer(model, optimizer, criterion, device, is_multilabel=is_multilabel)
+#     validator = Validator(model, criterion, device, is_multilabel=is_multilabel)
 
-    # 学習ループ
-    for epoch in range(config.training.max_epochs):
-        train_loss = trainer.train_epoch(train_dataloader)
-        val_loss = validator.validate(val_dataloader)
+#     # 学習ループ
+#     for epoch in range(config.training.max_epochs):
+#         train_loss = trainer.train_epoch(train_dataloader)
+#         val_loss = validator.validate(val_dataloader)
 
-        loss_history['train'].append(train_loss)
-        loss_history['val'].append(val_loss)
+#         loss_history['train'].append(train_loss)
+#         loss_history['val'].append(val_loss)
 
-        # ログ出力
-        log_message = "epoch %d: training_loss: %.4f validation_loss: %.4f" % (
-                       epoch+1,  train_loss,         val_loss)
+#         # ログ出力
+#         log_message = "epoch %d: training_loss: %.4f validation_loss: %.4f" % (
+#                        epoch+1,  train_loss,         val_loss)
         
-        logger.info(log_message)
+#         logger.info(log_message)
 
-        # モデル保存
-        if val_loss <= min(loss_history['val']):
-            torch.save(model.state_dict(), Path(save_dir, "best_model.pth"))
-            logger.info("Best model saved.")
+#         # モデル保存
+#         if val_loss <= min(loss_history['val']):
+#             torch.save(model.state_dict(), Path(save_dir, "best_model.pth"))
+#             logger.info("Best model saved.")
 
-    # 学習曲線の可視化
-    monitor.plot_learning_curve(loss_history)
-    monitor.save_loss_to_csv(loss_history)
+#     # 学習曲線の可視化
+#     monitor.plot_learning_curve(loss_history)
+#     monitor.save_loss_to_csv(loss_history)
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str, help='Path to config file', default='config.yaml')
+    parser.add_argument('-c', '--config', type=Path, help='Path to config file', default='config.yaml')
     parser.add_argument('-f', '--fold', type=int, help='Fold number to train (optional, if not set, trains all folds)')
-    parser.add_argument('-a', '--class_num', type=int, help='Number of classes to train (optional, if not set, uses the number of classes in the config file)')
     return parser.parse_args()
 
 
 def main():
     # 設定読み込み
     args = parse_args()
-    config = load_train_config(args.config)
+    config = load_experiment_config(args.config)
 
-    # 結果保存フォルダを作成
-    Path(config.paths.save_dir).mkdir(exist_ok=True)
+    if config.mode != 'train':
+        raise ValueError(f"config.yamlのmodeが 'train' 以外に設定されています (現在の設定: {config.mode})")
 
-    # 交差検証のためのデータ分割
-    splitter = CrossValidationSplitter(splits=config.splits.root)
-    split_folders = splitter.get_split_folders()
+    # Runner
+    runner = CVRunner(config)
 
-    # debug
-    # splits = splitter.get_fold_splits()
-    # print(splits)
-    # import sys
-    # sys.exit()
-
-    # --fold 引数が指定された場合は、そのfoldのみ学習
     if args.fold is not None:
-        if args.fold < 0 or args.fold >= len(split_folders):
-            raise ValueError(f"指定されたfold {args.fold} は無効です (0〜{len(split_folders)-1} の範囲で指定してください)")
-        
-        train_data_dirs = split_folders[args.fold]['train']
-        val_data_dirs = split_folders[args.fold]['val']
-        train_val(config, train_data_dirs, val_data_dirs, args.fold)
-    
-    # すべてのfoldを学習
+        # 指定されたfoldのみ学習
+        print(f"=== Fold {args.fold} の学習を開始します ===")
+        runner.run_single_fold_train(args.fold)
+        print(f"=== Fold {args.fold} の学習が完了しました ===")
     else:
-        # 各foldごとに学習を実行
-        for fold_idx, split_data in enumerate(split_folders):
-            # fold_idx = fold_idx + 1
-            # fold用の結果保存フォルダを作成
-            fold_save_dir = Path(config.paths.save_dir) / f"fold_{fold_idx}"
-            fold_save_dir.mkdir(parents=True, exist_ok=True)
+        # 全 fold 実行
+        n_folds = len(runner.splitter)
+        print(f"=== {n_folds} folds の学習を開始します ===")
+        results = runner.run_all_folds_train()
+        print(f"=== {len(results.fold_results)}/{n_folds} folds の学習が完了しました ===")
+        
+        if len(results.fold_results) < n_folds:
+            failed = n_folds - len(results.fold_results)
+            print(f"警告: {failed} fold(s) が失敗しました。ログを確認してください。")
+
+    # # 結果保存フォルダを作成
+    # Path(config.paths.save_dir).mkdir(exist_ok=True)
+
+    # # 交差検証のためのデータ分割
+    # splitter = CVSplitter(config.cv_splits.root, 
+    #                       train_ratio=config.cv_ratio.train, 
+    #                       val_ratio=config.cv_ratio.val, 
+    #                       test_ratio=config.cv_ratio.test
+    #                       )
+
+    # # --fold 引数が指定された場合は、そのfoldのみ学習
+    # if args.fold is not None:
+    #     if args.fold < 0 or args.fold >= len(split_folders):
+    #         raise ValueError(f"指定されたfold {args.fold} は無効です (0〜{len(split_folders)-1} の範囲で指定してください)")
+        
+    #     train_data_dirs = split_folders[args.fold]['train']
+    #     val_data_dirs = split_folders[args.fold]['val']
+    #     train_val(config, train_data_dirs, val_data_dirs, args.fold)
+    
+    # # すべてのfoldを学習
+    # else:
+    #     # 各foldごとに学習を実行
+    #     for fold_idx, split_data in enumerate(split_folders):
+    #         # fold用の結果保存フォルダを作成
+    #         fold_save_dir = Path(config.paths.save_dir) / f"fold_{fold_idx}"
+    #         fold_save_dir.mkdir(parents=True, exist_ok=True)
             
-            # 各foldで独立したロガーを設定
-            logger = setup_logging(fold_save_dir, f'training_fold_{fold_idx}')
-            logger.info(f"Started training for fold {fold_idx}")
+    #         # 各foldで独立したロガーを設定
+    #         logger = setup_logging(fold_save_dir, f'training_fold_{fold_idx}')
+    #         logger.info(f"Started training for fold {fold_idx}")
             
-            try:
-                # train_val関数にloggerを渡す
-                train_val(
-                    config=config,
-                    train_data_dirs=split_data['train'],
-                    val_data_dirs=split_data['val'],
-                    save_dir=fold_save_dir,
-                    logger=logger
-                )
-                logger.info(f"Completed training for fold {fold_idx}")
+    #         try:
+    #             # train_val関数にloggerを渡す
+    #             train_val(
+    #                 config=config,
+    #                 train_data_dirs=split_data['train'],
+    #                 val_data_dirs=split_data['val'],
+    #                 save_dir=fold_save_dir,
+    #                 logger=logger
+    #             )
+    #             logger.info(f"Completed training for fold {fold_idx}")
                 
-            except Exception as e:
-                logger.error(f"Error in fold {fold_idx}: {str(e)}")
-                continue
+    #         except Exception as e:
+    #             logger.error(f"Error in fold {fold_idx}: {str(e)}")
+    #             continue
 
 
 if __name__ == '__main__':

@@ -3,7 +3,13 @@ from .datasets import BaseMultiLabelDataset, CustomSingleLabelDataset
 from .transforms import get_train_transforms, get_test_transforms
 
 class DataLoaderFactory:
-    def __init__(self, dataset_root: str, batch_size: int, num_classes: int, num_gpus: int):
+    def __init__(
+            self,
+            dataset_root: str,
+            batch_size: int,
+            num_classes: int,
+            num_gpus: int = 1
+        ):
         """
         データローダーファクトリの初期化
 
@@ -32,10 +38,10 @@ class DataLoaderFactory:
         """
         return DataLoader(
             dataset,
-            batch_size=(1 if batch_size == 1 
-                        else batch_size * self.num_gpus),  # 条件式を直接埋め込み
+            batch_size=batch_size,
             shuffle=shuffle,
-            num_workers=4 * self.num_gpus
+            num_workers=4*self.num_gpus,
+            pin_memory=True
         )
 
     def create_multi_label_dataloaders(self, train_data_dirs: list, val_data_dirs: list) -> tuple[DataLoader, DataLoader]:

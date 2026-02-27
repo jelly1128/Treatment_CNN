@@ -1,4 +1,5 @@
 from enum import Enum
+from pathlib import Path
 import torch.nn as nn
 
 from typing import Literal
@@ -70,6 +71,16 @@ class ExperimentPaths(BaseModel):
     """
     save_dir: str
     model_paths: list[str] | None = None   # 学習済みモデルのパスリスト（テスト用）
+
+    @property
+    def save_dir_path(self) -> Path:
+        return Path(self.save_dir)
+
+    @property
+    def model_paths_as_path(self) -> list[Path] | None:
+        if self.model_paths is None:
+            return None
+        return [Path(p) for p in self.model_paths]
     
 class CVRatioConfig(BaseModel):
     """交差検証の分割比率を保持するデータクラス"""

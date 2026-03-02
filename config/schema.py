@@ -64,6 +64,8 @@ class TrainingConfig(BaseModel):
     freeze_backbone: bool
     learning_rate: float
     max_epochs: int
+    merge_label_indices: list[int] = [4, 5, 6, 11, 12]
+    merge_to_label: int = 4
 
 class ExperimentPaths(BaseModel):
     """
@@ -127,3 +129,4 @@ class ExperimentConfig(BaseModel):
     cv_ratio: CVRatioConfig
     cv_splits: CVSplitsConfig
     training: TrainingConfig | None = None  # トレーニング設定（テストモードでは不要）
+    window_sizes: list[int] = [1, 11]

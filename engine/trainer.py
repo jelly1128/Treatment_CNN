@@ -1,12 +1,13 @@
 from tqdm import tqdm
+import torch.nn as nn
 
 class Trainer:
-    def __init__(self, model, optimizer, criterion, device, is_multilabel=True):
+    def __init__(self, model, optimizer, criterion, device):
         self.model = model
         self.optimizer = optimizer
         self.criterion = criterion
         self.device = device
-        self.is_multilabel = is_multilabel
+        self.is_multilabel = isinstance(criterion, nn.BCEWithLogitsLoss)
 
     def train_epoch(self, train_loader):
         self.model.train()
@@ -17,18 +18,20 @@ class Trainer:
             self.optimizer.zero_grad()
             outputs = self.model(images)
 
-            if self.is_multilabel:
-                # モデルの出力次元数を確認
-                if outputs.shape[1] > 6:  # マルチタスクモデルの場合
-                    main_outputs, unclear_outputs = outputs[:, :6], outputs[:, 6:]
-                    main_labels, unclear_labels = labels[:, :6], labels[:, 6:] 
+            if self.is_multilabel:  # マルチラベルの場合
+                if hasattr(self.model, 'has_unclear_head') and self.model.has_unclear_head: # 不鮮明クラスのヘッドがある場合
+                    main_classes = self.model.main_classes
+                    main_outputs = outputs[:, :main_classes]
+                    unclear_outputs = outputs[:, main_classes:]
+                    main_labels = labels[:, :main_classes]
+                    unclear_labels = labels[:, main_classes:]
+                    
                     main_loss = self.criterion(main_outputs, main_labels)
                     unclear_loss = self.criterion(unclear_outputs, unclear_labels)
                     loss = main_loss + unclear_loss
                 else:  # 6クラスのみの場合
                     loss = self.criterion(outputs, labels)
-            else:
-                # シングルラベル（整数ラベル）用
+            else:  # シングルラベルの場合
                 loss = self.criterion(outputs, labels.long())
 
             total_loss += loss.item()

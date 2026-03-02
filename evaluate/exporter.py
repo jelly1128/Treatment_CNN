@@ -1,7 +1,6 @@
 import csv
 from pathlib import Path
 import numpy as np
-from labeling.label_converter import HardMultiLabelResult, SingleLabelResult
 
 def save_metrics_to_csv(video_metrics, overall_metrics, video_file_path, overall_file_path):
     """
@@ -17,19 +16,19 @@ def save_metrics_to_csv(video_metrics, overall_metrics, video_file_path, overall
     with open(video_file_path, mode='w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(["Video", "Class", "Precision", "Recall", "Accuracy"])
-        
+
         for video, metrics in video_metrics.items():
             for class_idx, (precision, recall, accuracy) in enumerate(zip(metrics['precision'], metrics['recall'], metrics['accuracy'])):
                 writer.writerow([video, class_idx, precision, recall, accuracy])
-    
+
     # 全体のメトリクスをCSVに保存
     with open(overall_file_path, mode='w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(["Class", "Precision", "Recall", "Accuracy"])
-        
+
         for class_idx, (precision, recall, accuracy) in enumerate(zip(overall_metrics['precision'], overall_metrics['recall'], overall_metrics['accuracy'])):
             writer.writerow([class_idx, precision, recall, accuracy])
-        
+
         writer.writerow(["Overall", overall_metrics['overall_precision'], overall_metrics['overall_recall'], overall_metrics['overall_accuracy']])
 
 def save_video_metrics_to_csv(video_metrics: dict[str, dict[str, float]], base_save_dir: Path, methods: str):
@@ -59,7 +58,7 @@ def save_video_metrics_to_csv(video_metrics: dict[str, dict[str, float]], base_s
             writer = csv.writer(file)
             writer.writerow(["Class", "Precision", "Recall", "F1 score", "Accuracy"])
             for class_idx, (precision, recall, f1_score, accuracy) in enumerate(zip(metrics['precision'], metrics['recall'], metrics['f1_score'], metrics['accuracy'])):
-                writer.writerow([class_idx, 
+                writer.writerow([class_idx,
                                  f"{precision:.4f}",
                                  f"{recall:.4f}",
                                  f"{f1_score:.4f}",
@@ -77,7 +76,7 @@ def save_overall_metrics_to_csv(overall_metrics, base_save_dir: Path, methods: s
     """
     base_path = base_save_dir / methods
     base_path.mkdir(parents=True, exist_ok=True)
-    
+
     # 各クラスの精度指標を保存
     class_metrics_file = base_path / f'{methods}_class_metrics.csv'
     with open(class_metrics_file, mode='w', newline='') as file:
@@ -90,7 +89,7 @@ def save_overall_metrics_to_csv(overall_metrics, base_save_dir: Path, methods: s
                              f"{metrics['f1_score']:.4f}",
                              f"{metrics['accuracy']:.4f}"
                             ])
-    
+
     # 各クラスの2×2混同行列を保存
     per_class_cm_file = base_path / f'{methods}_per_class_confusion_matrices.csv'
     with open(per_class_cm_file, mode='w', newline='') as file:

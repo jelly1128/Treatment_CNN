@@ -1,6 +1,6 @@
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, multilabel_confusion_matrix
 import numpy as np
-from labeling.label_converter import HardMultiLabelResult, SingleLabelResult
+from evaluate.result_types import HardMultiLabelResult, SingleLabelResult
 import pandas as pd
 from pathlib import Path
 

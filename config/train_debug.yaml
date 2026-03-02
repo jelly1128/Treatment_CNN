@@ -17,6 +17,8 @@ training:
   freeze_backbone: False
   learning_rate: 1e-4
   max_epochs: 3
+  # merge_label_indices: [4, 5, 6, 11, 12]  # シングルラベル用：マージするラベルのインデックス（デフォルト: [4, 5, 6, 11, 12]）
+  # merge_to_label: 4                        # シングルラベル用：マージ先のラベル番号（デフォルト: 4）
 
 cv_ratio:
   train: 2

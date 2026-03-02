@@ -3,7 +3,7 @@ import torch
 from torch.utils.data import DataLoader
 import csv
 from dataclasses import dataclass
-from labeling.result_types import InferenceResult, SingleLabelResult
+from evaluate.result_types import InferenceResult, SingleLabelResult
 
 class Inference:
     def __init__(self, model: torch.nn.Module, device: str):

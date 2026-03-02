@@ -2,11 +2,11 @@ import torch
 from tqdm import tqdm
 
 class Validator:
-    def __init__(self, model, criterion, device, is_multilabel=True):
+    def __init__(self, model, criterion, device):
         self.model = model
         self.criterion = criterion
         self.device = device
-        self.is_multilabel = is_multilabel
+        self.is_multilabel = isinstance(criterion, torch.nn.BCEWithLogitsLoss)
 
     def validate(self, val_loader):
         self.model.eval()
@@ -18,15 +18,21 @@ class Validator:
                 outputs = self.model(images)
 
                 if self.is_multilabel:
-                    if outputs.shape[1] > 6:  # マルチタスクモデルの場合
-                        main_outputs, unclear_outputs = outputs[:, :6], outputs[:, 6:]
-                        main_labels, unclear_labels = labels[:, :6], labels[:, 6:] 
+                    # モデルが Unclear Head を持っているかチェック
+                    if hasattr(self.model, 'has_unclear_head') and self.model.has_unclear_head:
+                        main_classes = self.model.main_classes
+                        
+                        main_outputs = outputs[:, :main_classes]
+                        unclear_outputs = outputs[:, main_classes:]
+                        main_labels = labels[:, :main_classes]
+                        unclear_labels = labels[:, main_classes:]
+                        
                         main_loss = self.criterion(main_outputs, main_labels)
                         unclear_loss = self.criterion(unclear_outputs, unclear_labels)
                         loss = main_loss + unclear_loss
                     else:  # 6クラスのみの場合
                         loss = self.criterion(outputs, labels)
-                else:
+                else:  # シングルラベルの場合
                     loss = self.criterion(outputs, labels.long())
                 
                 total_loss += loss.item()

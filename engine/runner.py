@@ -16,10 +16,10 @@ from utils.torch_utils import get_device_and_num_gpus, set_seed
 from utils.logger import logging, setup_logging
 from utils.training_monitor import TrainingMonitor
 from evaluate.analyzer import Analyzer
-from evaluate.results_visualizer import ResultsVisualizer
-from labeling.label_converter import MultiToSingleLabelConverter
+from evaluate.visualizer import ResultsVisualizer
+from evaluate.converter import MultiToSingleLabelConverter
 from evaluate.metrics import ClassificationMetricsCalculator
-from evaluate.save_metrics import save_video_metrics_to_csv, save_overall_metrics_to_csv
+from evaluate.exporter import save_video_metrics_to_csv, save_overall_metrics_to_csv
 from utils.window_key import WindowSizeKey
 
 
@@ -150,10 +150,9 @@ class CVRunner:
         """
         if self.config.mode != 'test':
             raise ValueError("run_all_folds_test() は mode='test' の config でのみ使用できます")
-        
-        # window_sizes の設定（TODO: config に移動すべき）
-        window_sizes = [1, 11]
-        
+
+        window_sizes = self.config.window_sizes
+
         all_folds_results = {}
         all_folds_window_results = WindowSizeKey.initialize_results(window_sizes)
         
@@ -206,10 +205,9 @@ class CVRunner:
         """
         if self.config.mode != 'test':
             raise ValueError("run_single_fold_test() は mode='test' の config でのみ使用できます")
-        
-        # window_sizes の設定（TODO: config に移動すべき）
-        window_sizes = [1, 11]
-        
+
+        window_sizes = self.config.window_sizes
+
         fold = self.splitter.get_fold(fold_idx)
         fold_dir = self._get_fold_dir(fold_idx)
         logger = setup_logging(fold_dir, f'test_fold_{fold_idx}')
@@ -250,11 +248,10 @@ class CVRunner:
         model_type = self.config.model.type  # モデルタイプを取得
         
         if model_type.value == 'single_label':
-            # シングルラベル用（TODO: merge_label の設定を config に移動すべき）
-            merge_label_indices = [4, 5, 6, 11, 12]
-            merge_to_label = 4
             train_dataloader, val_dataloader = dataloader_factory.create_single_label_dataloaders(
-                fold.train, fold.val, merge_label_indices, merge_to_label=merge_to_label
+                fold.train, fold.val,
+                self.config.training.merge_label_indices,
+                merge_to_label=self.config.training.merge_to_label,
             )
         else:
             # マルチラベル用
@@ -321,7 +318,8 @@ class CVRunner:
             num_classes=self.config.model.num_classes,
         )
         test_dataloaders = dataloader_factory.create_multi_label_test_dataloaders(fold.test)
-        
+        logger.info(f"Created test dataloaders for {len(test_dataloaders)} videos")
+
         # モデル読み込み（DataParallel で保存された古いファイルにも対応）
         model_path = self.config.paths.model_paths_as_path[fold_idx]
         model = self._build_model()
@@ -332,23 +330,25 @@ class CVRunner:
         model = model.to(self.device)
         if self.num_gpus > 1:
             model = torch.nn.DataParallel(model)
-        
+        logger.info(f"Loaded model from {model_path}")
+
         # 推論
         inference = Inference(model, self.device)
         results = inference.run(fold_dir, test_dataloaders)
-        
+        logger.info("Inference completed")
+
         # 可視化・メトリクス計算（現状の test.py のロジックをそのまま使用）
         visualizer = ResultsVisualizer(fold_dir)
         converter = MultiToSingleLabelConverter(results)
-        
+
         # マルチラベルを閾値でハードラベルに変換
         hard_multi_label_results = converter.convert_soft_to_hard_multi_labels(threshold=0.5)
         converter.save_hard_multi_label_results(hard_multi_label_results, fold_dir, methods='threshold_50%')
-        
+
         # 可視化
         visualizer.save_main_classes_visualization(hard_multi_label_results)
         visualizer.save_multi_label_visualization(hard_multi_label_results, methods='threshold_50%')
-        
+
         # メトリクス計算
         calculator = ClassificationMetricsCalculator(
             num_classes=self.config.model.num_classes,
@@ -356,16 +356,17 @@ class CVRunner:
         )
         video_metrics = calculator.calculate_multi_label_metrics_per_video(hard_multi_label_results)
         overall_metrics = calculator.calculate_multi_label_overall_metrics(hard_multi_label_results)
-        
+
         save_video_metrics_to_csv(video_metrics, fold_dir, methods='threshold_50%')
         save_overall_metrics_to_csv(overall_metrics, fold_dir / 'fold_results', methods='threshold_50%')
-        
+        logger.info("Metrics saved")
+
         # スライディングウィンドウ解析
         analyzer = Analyzer(fold_dir, self.config.model.num_classes)
         all_window_results = analyzer.analyze_sliding_windows(
             hard_multi_label_results, visualizer, calculator, window_sizes=window_sizes
         )
-        
+
         # ウィンドウ解析結果を保存
         for window_key, sliding_window_results in all_window_results.items():
             visualizer.save_single_label_visualization(sliding_window_results, methods=window_key)

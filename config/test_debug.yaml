@@ -17,6 +17,8 @@ paths:
     - 'train_refactor/fold_1/best_model.pth'
     - 'train_refactor/fold_2/best_model.pth'
 
+window_sizes: [1, 11, 31]  # スライディングウィンドウのサイズリスト（デフォルト: [1, 11]）
+
 cv_ratio:
   train: 2
   val: 1

@@ -1,10 +1,10 @@
 import csv
 import numpy as np
 from engine.inference import InferenceResult
-from labeling.label_converter import HardMultiLabelResult, SingleLabelResult
+from evaluate.result_types import HardMultiLabelResult, SingleLabelResult
 from pathlib import Path
 from evaluate.metrics import ClassificationMetricsCalculator
-from evaluate.results_visualizer import ResultsVisualizer
+from evaluate.visualizer import ResultsVisualizer
 from utils.window_key import WindowSizeKey
 
 class Analyzer:

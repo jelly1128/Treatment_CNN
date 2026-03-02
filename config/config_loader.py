@@ -2,15 +2,7 @@ from pathlib import Path
 
 import yaml
 
-from config.schema import (
-    ExperimentConfig,
-    ModelConfig,
-    DatasetConfig,
-    TrainingConfig,
-    ExperimentPaths,
-    CVRatioConfig,
-    CVSplitsConfig,
-)
+from config.schema import ExperimentConfig
 
 def load_experiment_config(config_path: Path) -> ExperimentConfig:
     """
@@ -33,12 +25,4 @@ def load_experiment_config(config_path: Path) -> ExperimentConfig:
     if not required_keys.issubset(config_dict.keys()):
         raise ValueError(f"設定ファイルの構造が正しくありません: {config_dict}")
     
-    return ExperimentConfig(
-        mode=config_dict['mode'],
-        model=ModelConfig(**config_dict['model']),
-        dataset=DatasetConfig(**config_dict['dataset']),
-        paths=ExperimentPaths(**config_dict['paths']),
-        cv_ratio=CVRatioConfig(**config_dict['cv_ratio']),
-        cv_splits=CVSplitsConfig(config_dict['cv_splits']),
-        training=TrainingConfig(**config_dict['training']) if 'training' in config_dict else None
-    )
+    return ExperimentConfig.model_validate(config_dict)

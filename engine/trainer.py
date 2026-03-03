@@ -2,6 +2,8 @@ from tqdm import tqdm
 import torch.nn as nn
 
 class Trainer:
+    """1エポック分の学習を実行するクラス。マルチラベル・シングルラベル両方に対応。"""
+
     def __init__(self, model, optimizer, criterion, device):
         self.model = model
         self.optimizer = optimizer
@@ -10,6 +12,15 @@ class Trainer:
         self.is_multilabel = isinstance(criterion, nn.BCEWithLogitsLoss)
 
     def train_epoch(self, train_loader):
+        """
+        1エポック分の学習を実行する。
+
+        Args:
+            train_loader: 学習データのDataLoader。
+
+        Returns:
+            float: エポック全体の平均損失。
+        """
         self.model.train()
         total_loss = 0.0
         

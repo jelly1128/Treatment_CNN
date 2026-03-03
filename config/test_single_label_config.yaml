@@ -1,7 +1,8 @@
 mode: test
+
 model:
   architecture: 'resnet18'
-  type: 'multitask'
+  type: 'single_label'
   num_classes: 6
 
 dataset:
@@ -10,17 +11,23 @@ dataset:
   batch_size: 1
 
 paths:
-  save_dir: 'test_refactor'
+  save_dir: 'test_single_label'
   model_paths:
-    - 'train_refactor/fold_0/best_model.pth'
-    - 'train_refactor/fold_1/best_model.pth'
-    - 'train_refactor/fold_1/best_model.pth'
-    - 'train_refactor/fold_2/best_model.pth'
+    - 'train_single_label/fold_0/best_model.pth'
+    - 'train_single_label/fold_1/best_model.pth'
+    - 'train_single_label/fold_2/best_model.pth'
+    - 'train_single_label/fold_3/best_model.pth'
+
+training:
+  pretrained: True
+  freeze_backbone: False
+  learning_rate: 1e-4
+  max_epochs: 10
+  merge_label_indices: [4, 5, 6, 11, 12]
+  merge_to_label: 4
 
 # ── オプション設定（省略するとデフォルト値が使われる）──
-# random_seed: 42  # 乱数シード
-# threshold: 0.5   # マルチラベル判定の閾値（出力フォルダ名にも反映される）
-window_sizes: [1, 11, 31]  # スライディングウィンドウのサイズリスト（デフォルト: [1, 11]）
+# random_seed: 42
 
 cv_ratio:
   train: 2

@@ -6,15 +6,6 @@ import torch
 from torch.utils.data import Dataset
 import torchvision.transforms as transforms
 
-"""
-修正したい箇所
-if self.num_classes == 6: や elif self.num_classes == 7: といった条件分岐。
-
-_filter_labels メソッド内でのマジックナンバー（例：6以上14以下を6に置き換える 処理）。
-
-"""
-
-
 class BaseMultiLabelDataset(Dataset):
     """
     マルチラベルデータセットの基底クラス。

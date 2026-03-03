@@ -6,6 +6,11 @@ from engine.runner import CVRunner
 
 
 def parse_args():
+    """コマンドライン引数を解析する。
+
+    Returns:
+        argparse.Namespace: 解析済み引数（config, fold）。
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', type=Path, help='Path to config file', default='config.yaml')
     parser.add_argument('-f', '--fold', type=int, help='Fold number to train (optional, if not set, trains all folds)')
@@ -13,6 +18,7 @@ def parse_args():
 
 
 def main():
+    """設定ファイルを読み込み、CVRunnerで学習を実行する。"""
     # 設定読み込み
     args = parse_args()
     config = load_experiment_config(args.config)

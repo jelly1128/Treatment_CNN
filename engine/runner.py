@@ -5,7 +5,7 @@ from typing import Literal
 import torch
 import torch.optim as optim
 
-from config.schema import ExperimentConfig
+from config.schema import ExperimentConfig, ModelType
 from data.data_splitter import CVSplitter, FoldSplit
 from data.dataloader import DataLoaderFactory
 from engine.trainer import Trainer
@@ -159,68 +159,98 @@ class CVRunner:
             raise ValueError("run_all_folds_test() は mode='test' の config でのみ使用できます")
 
         window_sizes = self.config.window_sizes
-
-        all_folds_results = {}
-        all_folds_window_results = WindowSizeKey.initialize_results(window_sizes)
         fold_results = {}
 
-        for fold_idx, fold in enumerate(self.splitter):
-            fold_dir = self._get_fold_dir(fold_idx)
-            logger = setup_logging(fold_dir, f'test_fold_{fold_idx}')
-
-            try:
-                logger.info(f"Started test for fold {fold_idx}")
-                hard_multi_label_results, all_window_results = self._run_single_fold_test_internal(
-                    fold_idx, fold, fold_dir, logger, window_sizes
-                )
-
-                fold_results[fold_idx] = FoldResult(
-                    fold_idx=fold_idx,
-                    metrics={'hard_multi_label_results': hard_multi_label_results}
-                )
-
-                # 各 fold の結果を全体の辞書に追加
-                for folder_name, result in hard_multi_label_results.items():
-                    if folder_name not in all_folds_results:
-                        all_folds_results[folder_name] = result
-
-                for window_key, sliding_window_results in all_window_results.items():
-                    for folder_name, result in sliding_window_results.items():
-                        all_folds_window_results[window_key][folder_name] = result
-
-                logger.info(f"Completed test for fold {fold_idx}")
-            except Exception as e:
-                logger.error(f"Fold {fold_idx} failed: {e}", exc_info=True)
-                continue
-
-        # 全 fold の結果を集約
         calculator = ClassificationMetricsCalculator(
             num_classes=self.config.model.num_classes,
             mode=self.config.model.type.value
         )
 
-        # マルチラベル（閾値変換）の全fold統計
-        threshold = self.config.threshold
-        threshold_method = f'threshold_{int(threshold * 100)}%'
-        threshold_save_dir = self.config.paths.save_dir_path / threshold_method
-        threshold_save_dir.mkdir(parents=True, exist_ok=True)
-        threshold_all_folds_metrics = calculator.calculate_multi_label_overall_metrics(all_folds_results)
-        save_all_folds_metrics_to_csv(
-            threshold_all_folds_metrics['class_metrics'],
-            threshold_all_folds_metrics['class_confusion_matrix'],
-            threshold_save_dir
-        )
+        if self.config.model.type == ModelType.SINGLE_LABEL:
+            # ── シングルラベルの全fold集約 ──
+            all_folds_single_label_results = {}
 
-        # スライディングウィンドウの全fold統計
-        for window_key, all_window_results in all_folds_window_results.items():
-            save_dir = self.config.paths.save_dir_path / window_key
+            for fold_idx, fold in enumerate(self.splitter):
+                fold_dir = self._get_fold_dir(fold_idx)
+                logger = setup_logging(fold_dir, f'test_fold_{fold_idx}')
+
+                try:
+                    logger.info(f"Started test for fold {fold_idx}")
+                    single_label_results, _ = self._run_single_fold_test_internal(
+                        fold_idx, fold, fold_dir, logger, window_sizes
+                    )
+                    fold_results[fold_idx] = FoldResult(fold_idx=fold_idx, metrics={})
+                    for folder_name, result in single_label_results.items():
+                        all_folds_single_label_results[folder_name] = result
+                    logger.info(f"Completed test for fold {fold_idx}")
+                except Exception as e:
+                    logger.error(f"Fold {fold_idx} failed: {e}", exc_info=True)
+                    continue
+
+            save_dir = self.config.paths.save_dir_path / 'single_label'
             save_dir.mkdir(parents=True, exist_ok=True)
-            window_all_folds_metrics = calculator.calculate_all_folds_metrics(all_window_results)
+            all_folds_metrics = calculator.calculate_all_folds_metrics(all_folds_single_label_results)
             save_all_folds_metrics_to_csv(
-                window_all_folds_metrics['class_metrics'],
-                window_all_folds_metrics['class_confusion_matrix'],
+                all_folds_metrics['class_metrics'],
+                all_folds_metrics['class_confusion_matrix'],
                 save_dir
             )
+
+        else:
+            # ── マルチラベルの全fold集約 ──
+            all_folds_results = {}
+            all_folds_window_results = WindowSizeKey.initialize_results(window_sizes)
+
+            for fold_idx, fold in enumerate(self.splitter):
+                fold_dir = self._get_fold_dir(fold_idx)
+                logger = setup_logging(fold_dir, f'test_fold_{fold_idx}')
+
+                try:
+                    logger.info(f"Started test for fold {fold_idx}")
+                    hard_multi_label_results, all_window_results = self._run_single_fold_test_internal(
+                        fold_idx, fold, fold_dir, logger, window_sizes
+                    )
+
+                    fold_results[fold_idx] = FoldResult(
+                        fold_idx=fold_idx,
+                        metrics={'hard_multi_label_results': hard_multi_label_results}
+                    )
+
+                    for folder_name, result in hard_multi_label_results.items():
+                        if folder_name not in all_folds_results:
+                            all_folds_results[folder_name] = result
+
+                    for window_key, sliding_window_results in all_window_results.items():
+                        for folder_name, result in sliding_window_results.items():
+                            all_folds_window_results[window_key][folder_name] = result
+
+                    logger.info(f"Completed test for fold {fold_idx}")
+                except Exception as e:
+                    logger.error(f"Fold {fold_idx} failed: {e}", exc_info=True)
+                    continue
+
+            # マルチラベル（閾値変換）の全fold統計
+            threshold = self.config.threshold
+            threshold_method = f'threshold_{int(threshold * 100)}%'
+            threshold_save_dir = self.config.paths.save_dir_path / threshold_method
+            threshold_save_dir.mkdir(parents=True, exist_ok=True)
+            threshold_all_folds_metrics = calculator.calculate_multi_label_overall_metrics(all_folds_results)
+            save_all_folds_metrics_to_csv(
+                threshold_all_folds_metrics['class_metrics'],
+                threshold_all_folds_metrics['class_confusion_matrix'],
+                threshold_save_dir
+            )
+
+            # スライディングウィンドウの全fold統計
+            for window_key, all_window_results in all_folds_window_results.items():
+                save_dir = self.config.paths.save_dir_path / window_key
+                save_dir.mkdir(parents=True, exist_ok=True)
+                window_all_folds_metrics = calculator.calculate_all_folds_metrics(all_window_results)
+                save_all_folds_metrics_to_csv(
+                    window_all_folds_metrics['class_metrics'],
+                    window_all_folds_metrics['class_confusion_matrix'],
+                    save_dir
+                )
 
         return AggregatedResult(fold_results=fold_results)
     
@@ -249,7 +279,8 @@ class CVRunner:
         )
         logger.info(f"Completed test for fold {fold_idx}")
 
-        return FoldResult(fold_idx=fold_idx, metrics={'window_sizes': list(all_window_results.keys())})
+        metrics = {} if all_window_results is None else {'window_sizes': list(all_window_results.keys())}
+        return FoldResult(fold_idx=fold_idx, metrics=metrics)
     
     # ──────────────────────────────────────────
     # 内部メソッド（train）
@@ -333,23 +364,21 @@ class CVRunner:
     # ──────────────────────────────────────────
     
     def _run_single_fold_test_internal(
-        self, 
-        fold_idx: int, 
-        fold: FoldSplit, 
-        fold_dir: Path, 
-        logger: logging.Logger, 
+        self,
+        fold_idx: int,
+        fold: FoldSplit,
+        fold_dir: Path,
+        logger: logging.Logger,
         window_sizes: list[int]
-    ) -> tuple[dict, dict]:
+    ) -> tuple[dict, dict | None]:
         """1つの fold のテストを実行（内部実装）"""
-        
+
         # DataLoader 作成
         dataloader_factory = DataLoaderFactory(
             dataset_root=self.config.dataset.root,
             batch_size=self.config.dataset.batch_size,
             num_classes=self.config.model.num_classes,
         )
-        test_dataloaders = dataloader_factory.create_multi_label_test_dataloaders(fold.test)
-        logger.info(f"Created test dataloaders for {len(test_dataloaders)} videos")
 
         # モデル読み込み（DataParallel で保存された古いファイルにも対応）
         model_path = self.config.paths.model_paths_as_path[fold_idx]
@@ -363,45 +392,68 @@ class CVRunner:
             model = torch.nn.DataParallel(model)
         logger.info(f"Loaded model from {model_path}")
 
-        # 推論
         inference = Inference(model, self.device)
-        results = inference.run(test_dataloaders)
-        for video_name, result in results.items():
-            save_raw_inference_results_to_csv(result, fold_dir, video_name)
-        logger.info("Inference completed")
-
         visualizer = ResultsVisualizer(fold_dir)
-        converter = MultiToSingleLabelConverter(results, num_classes=self.config.model.num_classes)
         calculator = ClassificationMetricsCalculator(
             num_classes=self.config.model.num_classes,
             mode=self.config.model.type.value
         )
 
-        # マルチラベルをハードラベルに変換・保存・評価
-        threshold = self.config.threshold
-        threshold_method = f'threshold_{int(threshold * 100)}%'
-        hard_multi_label_results = converter.convert_soft_to_hard_multi_labels(threshold=threshold)
-        save_hard_multi_label_results_to_csv(hard_multi_label_results, fold_dir, methods=threshold_method)
+        if self.config.model.type == ModelType.SINGLE_LABEL:
+            # ── シングルラベルパイプライン ──
+            test_dataloaders = dataloader_factory.create_single_label_test_dataloaders(
+                fold.test,
+                self.config.training.merge_label_indices,
+                self.config.training.merge_to_label,
+            )
+            logger.info(f"Created test dataloaders for {len(test_dataloaders)} videos")
 
-        visualizer.save_main_classes_visualization(hard_multi_label_results)
-        self._evaluate_and_save(
-            hard_multi_label_results, visualizer, calculator, fold_dir, threshold_method, 'multi_label'
-        )
-        logger.info("Metrics saved")
+            results = inference.run(test_dataloaders, mode='single_label')
+            logger.info("Inference completed")
 
-        # スライディングウィンドウ解析・保存・評価
-        analyzer = Analyzer(self.config.model.num_classes)
-        all_window_results = analyzer.analyze_sliding_windows(
-            hard_multi_label_results, window_sizes=window_sizes
-        )
+            save_single_label_results_to_csv(results, fold_dir, methods='single_label')
+            self._evaluate_and_save(results, visualizer, calculator, fold_dir, 'single_label', 'single_label')
+            logger.info("Metrics saved")
 
-        for window_key, sliding_window_results in all_window_results.items():
-            save_single_label_results_to_csv(sliding_window_results, fold_dir, methods=window_key)
+            return results, None
+
+        else:
+            # ── マルチラベルパイプライン ──
+            test_dataloaders = dataloader_factory.create_multi_label_test_dataloaders(fold.test)
+            logger.info(f"Created test dataloaders for {len(test_dataloaders)} videos")
+
+            results = inference.run(test_dataloaders)
+            for video_name, result in results.items():
+                save_raw_inference_results_to_csv(result, fold_dir, video_name)
+            logger.info("Inference completed")
+
+            converter = MultiToSingleLabelConverter(results, num_classes=self.config.model.num_classes)
+
+            # マルチラベルをハードラベルに変換・保存・評価
+            threshold = self.config.threshold
+            threshold_method = f'threshold_{int(threshold * 100)}%'
+            hard_multi_label_results = converter.convert_soft_to_hard_multi_labels(threshold=threshold)
+            save_hard_multi_label_results_to_csv(hard_multi_label_results, fold_dir, methods=threshold_method)
+
+            visualizer.save_main_classes_visualization(hard_multi_label_results)
             self._evaluate_and_save(
-                sliding_window_results, visualizer, calculator, fold_dir, window_key, 'single_label'
+                hard_multi_label_results, visualizer, calculator, fold_dir, threshold_method, 'multi_label'
+            )
+            logger.info("Metrics saved")
+
+            # スライディングウィンドウ解析・保存・評価
+            analyzer = Analyzer(self.config.model.num_classes)
+            all_window_results = analyzer.analyze_sliding_windows(
+                hard_multi_label_results, window_sizes=window_sizes
             )
 
-        return hard_multi_label_results, all_window_results
+            for window_key, sliding_window_results in all_window_results.items():
+                save_single_label_results_to_csv(sliding_window_results, fold_dir, methods=window_key)
+                self._evaluate_and_save(
+                    sliding_window_results, visualizer, calculator, fold_dir, window_key, 'single_label'
+                )
+
+            return hard_multi_label_results, all_window_results
     
     # ──────────────────────────────────────────
     # ヘルパーメソッド

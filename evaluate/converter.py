@@ -1,6 +1,4 @@
 from evaluate.result_types import InferenceResult, HardMultiLabelResult
-import csv
-from pathlib import Path
 
 """
 修正したい箇所
@@ -10,8 +8,9 @@ from pathlib import Path
 
 
 class MultiToSingleLabelConverter:
-    def __init__(self, inference_results_dict: dict[str, InferenceResult]):
+    def __init__(self, inference_results_dict: dict[str, InferenceResult], num_classes: int = 6):
         self.inference_results_dict = inference_results_dict
+        self.num_classes = num_classes
 
     def convert_soft_to_hard_multi_labels(self, threshold: float = 0.5) -> dict[str, HardMultiLabelResult]:
         """
@@ -36,7 +35,7 @@ class MultiToSingleLabelConverter:
                 # 全てのラベルが0の場合の処理
                 if sum(hard_multi_label) == 0:
                     # 主ラベル（0-5）の中で最も確率が高いものを見つける
-                    main_probs = probabilities[:6]  # 主ラベルの確率
+                    main_probs = probabilities[:self.num_classes]  # 主ラベルの確率
                     max_main_prob = max(main_probs)
                     max_main_idx = main_probs.index(max_main_prob)
 
@@ -44,8 +43,8 @@ class MultiToSingleLabelConverter:
                     hard_multi_label = [0] * len(probabilities)
                     hard_multi_label[max_main_idx] = 1  # 最も確率の高い主ラベルを1に設定
 
-                    # サブラベル（6以降）で主ラベルの最大確率より高いものを1に設定
-                    for i, prob in enumerate(probabilities[6:], start=6):
+                    # サブラベル（num_classes以降）で主ラベルの最大確率より高いものを1に設定
+                    for i, prob in enumerate(probabilities[self.num_classes:], start=self.num_classes):
                         if prob > max_main_prob:
                             hard_multi_label[i] = 1
 
@@ -56,42 +55,3 @@ class MultiToSingleLabelConverter:
             hard_multi_labels_results[video_name] = hard_multi_label_result
 
         return hard_multi_labels_results
-
-    def save_hard_multi_label_results(self,
-                                      hard_multi_label_results: dict[str, HardMultiLabelResult],
-                                      save_dir_path: Path,
-                                      methods: str = "threshold"):
-        """
-        マルチラベルの変換結果をCSVファイルに保存します。
-
-        Args:
-            hard_multi_label_results (dict[str, HardMultiLabelResult]): 変換結果の辞書
-            save_dir (Path): 保存先ディレクトリ
-            method (str): 変換手法の名前（ファイル名に使用）
-        """
-        # 保存先ディレクトリが存在しない場合は作成
-        save_dir_path.mkdir(parents=True, exist_ok=True)
-
-        # 動画ごとに結果を保存
-        for video_name, result in hard_multi_label_results.items():
-            video_results_dir = save_dir_path / video_name / methods
-            video_results_dir.mkdir(parents=True, exist_ok=True)
-            # フォルダごとのCSVファイルを作成
-            video_results_csv = video_results_dir / f'{methods}_results_{video_name}.csv'
-
-            with open(video_results_csv, mode='w', newline='') as file:
-                writer = csv.writer(file)
-                # ヘッダー行
-                header = ['Image_Path']
-                header.extend([f'Label_{i}' for i in range(len(result.multi_labels[0]))])  # 予測ラベル
-                header.extend([f'True_Label_{i}' for i in range(len(result.ground_truth_labels[0]))])  # 正解ラベル
-                writer.writerow(header)
-
-                # データ行
-                for img_path,           pred_labels,          true_labels in zip(
-                    result.image_paths, result.multi_labels,  result.ground_truth_labels
-                ):
-                    row = [img_path]
-                    row.extend(pred_labels)
-                    row.extend(true_labels)
-                    writer.writerow(row)

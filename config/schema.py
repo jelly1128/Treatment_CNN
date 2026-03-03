@@ -130,3 +130,5 @@ class ExperimentConfig(BaseModel):
     cv_splits: CVSplitsConfig
     training: TrainingConfig | None = None  # トレーニング設定（テストモードでは不要）
     window_sizes: list[int] = [1, 11]
+    random_seed: int = 42
+    threshold: float = 0.5

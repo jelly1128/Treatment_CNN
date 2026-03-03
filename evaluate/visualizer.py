@@ -1,8 +1,6 @@
 import numpy as np
 from pathlib import Path
-import csv
 import svgwrite
-from engine.inference import InferenceResult
 from evaluate.result_types import HardMultiLabelResult, SingleLabelResult
 
 # 定数の定義
@@ -26,57 +24,6 @@ class ResultsVisualizer:
         """
         self.save_dir_path = save_dir_path
         self.save_dir_path.mkdir(parents=True, exist_ok=True)
-
-    def load_results(self, csv_path: Path) -> InferenceResult:
-        """
-        CSVファイルから推論結果を読み込む。
-
-        Args:
-            csv_path: 読み込むCSVファイルのパス
-
-        Returns:
-            InferenceResult: 読み込んだ推論結果
-        """
-        try:
-            image_paths, probabilities, labels = self._read_csv(csv_path)
-            return InferenceResult(image_paths=image_paths, probabilities=probabilities, labels=labels)
-        except Exception as e:
-            raise
-
-    def _read_csv(self, csv_path: Path):
-        """CSVファイルを読み込み、データを分割するヘルパーメソッド
-
-        Args:
-            csv_path (Path): 読み込むCSVファイルのパス
-
-        Returns:
-            tuple:
-                list[str]: 画像パスのリスト
-                list[list[float]]: 確率値のリスト
-                list[list[int]]: ラベルのリスト
-        """
-        image_paths = []
-        probabilities = []
-        ground_truth_labels = []
-
-        with open(csv_path, mode='r', newline='') as file:
-            reader = csv.reader(file)
-            header = next(reader)  # ヘッダーをスキップ
-
-            for row in reader:
-                image_paths.append(row[0])
-                # 確率値とラベルの区切り位置を計算
-                num_probabilities = (len(row) - 1) // 2
-
-                # 確率値とラベルを分割して追加
-                probabilities.append(
-                    list(map(float, row[1:num_probabilities + 1]))
-                )
-                ground_truth_labels.append(
-                    list(map(int, row[num_probabilities + 1:]))
-                )
-
-        return image_paths, probabilities, ground_truth_labels
 
     def save_multi_label_visualization(self,
                                        results: dict[str, HardMultiLabelResult],

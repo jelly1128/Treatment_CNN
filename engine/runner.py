@@ -19,7 +19,14 @@ from evaluate.analyzer import Analyzer
 from evaluate.visualizer import ResultsVisualizer
 from evaluate.converter import MultiToSingleLabelConverter
 from evaluate.metrics import ClassificationMetricsCalculator
-from evaluate.exporter import save_video_metrics_to_csv, save_overall_metrics_to_csv
+from evaluate.exporter import (
+    save_video_metrics_to_csv,
+    save_overall_metrics_to_csv,
+    save_hard_multi_label_results_to_csv,
+    save_single_label_results_to_csv,
+    save_all_folds_metrics_to_csv,
+    save_raw_inference_results_to_csv,
+)
 from utils.window_key import WindowSizeKey
 
 
@@ -74,7 +81,7 @@ class CVRunner:
         """
         self.config = config
         self.device, self.num_gpus = get_device_and_num_gpus()
-        set_seed(42)
+        set_seed(self.config.random_seed)
         
         # CVSplitter を構築
         self.splitter = CVSplitter(
@@ -155,43 +162,67 @@ class CVRunner:
 
         all_folds_results = {}
         all_folds_window_results = WindowSizeKey.initialize_results(window_sizes)
-        
+        fold_results = {}
+
         for fold_idx, fold in enumerate(self.splitter):
             fold_dir = self._get_fold_dir(fold_idx)
             logger = setup_logging(fold_dir, f'test_fold_{fold_idx}')
-            
+
             try:
                 logger.info(f"Started test for fold {fold_idx}")
                 hard_multi_label_results, all_window_results = self._run_single_fold_test_internal(
                     fold_idx, fold, fold_dir, logger, window_sizes
                 )
-                
+
+                fold_results[fold_idx] = FoldResult(
+                    fold_idx=fold_idx,
+                    metrics={'hard_multi_label_results': hard_multi_label_results}
+                )
+
                 # 各 fold の結果を全体の辞書に追加
                 for folder_name, result in hard_multi_label_results.items():
                     if folder_name not in all_folds_results:
                         all_folds_results[folder_name] = result
-                
+
                 for window_key, sliding_window_results in all_window_results.items():
                     for folder_name, result in sliding_window_results.items():
                         all_folds_window_results[window_key][folder_name] = result
-                
+
                 logger.info(f"Completed test for fold {fold_idx}")
             except Exception as e:
                 logger.error(f"Fold {fold_idx} failed: {e}", exc_info=True)
                 continue
-        
+
         # 全 fold の結果を集約
         calculator = ClassificationMetricsCalculator(
             num_classes=self.config.model.num_classes,
-            mode="multitask"
+            mode=self.config.model.type.value
         )
-        
+
+        # マルチラベル（閾値変換）の全fold統計
+        threshold = self.config.threshold
+        threshold_method = f'threshold_{int(threshold * 100)}%'
+        threshold_save_dir = self.config.paths.save_dir_path / threshold_method
+        threshold_save_dir.mkdir(parents=True, exist_ok=True)
+        threshold_all_folds_metrics = calculator.calculate_multi_label_overall_metrics(all_folds_results)
+        save_all_folds_metrics_to_csv(
+            threshold_all_folds_metrics['class_metrics'],
+            threshold_all_folds_metrics['class_confusion_matrix'],
+            threshold_save_dir
+        )
+
+        # スライディングウィンドウの全fold統計
         for window_key, all_window_results in all_folds_window_results.items():
             save_dir = self.config.paths.save_dir_path / window_key
             save_dir.mkdir(parents=True, exist_ok=True)
-            calculator.calculate_all_folds_metrics(all_window_results, save_dir)
-        
-        return AggregatedResult(fold_results={})  # TODO: 適切な結果を返す
+            window_all_folds_metrics = calculator.calculate_all_folds_metrics(all_window_results)
+            save_all_folds_metrics_to_csv(
+                window_all_folds_metrics['class_metrics'],
+                window_all_folds_metrics['class_confusion_matrix'],
+                save_dir
+            )
+
+        return AggregatedResult(fold_results=fold_results)
     
     def run_single_fold_test(self, fold_idx: int) -> FoldResult:
         """
@@ -213,12 +244,12 @@ class CVRunner:
         logger = setup_logging(fold_dir, f'test_fold_{fold_idx}')
         
         logger.info(f"Started test for fold {fold_idx}")
-        hard_multi_label_results, all_window_results = self._run_single_fold_test_internal(
+        _, all_window_results = self._run_single_fold_test_internal(
             fold_idx, fold, fold_dir, logger, window_sizes
         )
         logger.info(f"Completed test for fold {fold_idx}")
-        
-        return FoldResult(fold_idx=fold_idx, metrics={})  # TODO: 適切な結果を返す
+
+        return FoldResult(fold_idx=fold_idx, metrics={'window_sizes': list(all_window_results.keys())})
     
     # ──────────────────────────────────────────
     # 内部メソッド（train）
@@ -334,63 +365,71 @@ class CVRunner:
 
         # 推論
         inference = Inference(model, self.device)
-        results = inference.run(fold_dir, test_dataloaders)
+        results = inference.run(test_dataloaders)
+        for video_name, result in results.items():
+            save_raw_inference_results_to_csv(result, fold_dir, video_name)
         logger.info("Inference completed")
 
-        # 可視化・メトリクス計算（現状の test.py のロジックをそのまま使用）
         visualizer = ResultsVisualizer(fold_dir)
-        converter = MultiToSingleLabelConverter(results)
-
-        # マルチラベルを閾値でハードラベルに変換
-        hard_multi_label_results = converter.convert_soft_to_hard_multi_labels(threshold=0.5)
-        converter.save_hard_multi_label_results(hard_multi_label_results, fold_dir, methods='threshold_50%')
-
-        # 可視化
-        visualizer.save_main_classes_visualization(hard_multi_label_results)
-        visualizer.save_multi_label_visualization(hard_multi_label_results, methods='threshold_50%')
-
-        # メトリクス計算
+        converter = MultiToSingleLabelConverter(results, num_classes=self.config.model.num_classes)
         calculator = ClassificationMetricsCalculator(
             num_classes=self.config.model.num_classes,
-            mode="multitask"
+            mode=self.config.model.type.value
         )
-        video_metrics = calculator.calculate_multi_label_metrics_per_video(hard_multi_label_results)
-        overall_metrics = calculator.calculate_multi_label_overall_metrics(hard_multi_label_results)
 
-        save_video_metrics_to_csv(video_metrics, fold_dir, methods='threshold_50%')
-        save_overall_metrics_to_csv(overall_metrics, fold_dir / 'fold_results', methods='threshold_50%')
+        # マルチラベルをハードラベルに変換・保存・評価
+        threshold = self.config.threshold
+        threshold_method = f'threshold_{int(threshold * 100)}%'
+        hard_multi_label_results = converter.convert_soft_to_hard_multi_labels(threshold=threshold)
+        save_hard_multi_label_results_to_csv(hard_multi_label_results, fold_dir, methods=threshold_method)
+
+        visualizer.save_main_classes_visualization(hard_multi_label_results)
+        self._evaluate_and_save(
+            hard_multi_label_results, visualizer, calculator, fold_dir, threshold_method, 'multi_label'
+        )
         logger.info("Metrics saved")
 
-        # スライディングウィンドウ解析
-        analyzer = Analyzer(fold_dir, self.config.model.num_classes)
+        # スライディングウィンドウ解析・保存・評価
+        analyzer = Analyzer(self.config.model.num_classes)
         all_window_results = analyzer.analyze_sliding_windows(
-            hard_multi_label_results, visualizer, calculator, window_sizes=window_sizes
+            hard_multi_label_results, window_sizes=window_sizes
         )
 
-        # ウィンドウ解析結果を保存
         for window_key, sliding_window_results in all_window_results.items():
-            visualizer.save_single_label_visualization(sliding_window_results, methods=window_key)
-            
-            sliding_window_video_metrics = calculator.calculate_single_label_metrics_per_video(
-                sliding_window_results
+            save_single_label_results_to_csv(sliding_window_results, fold_dir, methods=window_key)
+            self._evaluate_and_save(
+                sliding_window_results, visualizer, calculator, fold_dir, window_key, 'single_label'
             )
-            sliding_window_overall_metrics = calculator.calculate_single_label_overall_metrics(
-                sliding_window_results
-            )
-            
-            save_video_metrics_to_csv(sliding_window_video_metrics, fold_dir, methods=window_key)
-            save_overall_metrics_to_csv(
-                sliding_window_overall_metrics,
-                fold_dir / 'fold_results',
-                methods=window_key
-            )
-        
+
         return hard_multi_label_results, all_window_results
     
     # ──────────────────────────────────────────
     # ヘルパーメソッド
     # ──────────────────────────────────────────
-    
+
+    def _evaluate_and_save(
+        self,
+        results: dict,
+        visualizer: ResultsVisualizer,
+        calculator: ClassificationMetricsCalculator,
+        fold_dir: Path,
+        methods: str,
+        label_type: Literal['multi_label', 'single_label']
+    ) -> dict:
+        """可視化・メトリクス計算・CSV保存をまとめて行うヘルパー"""
+        if label_type == 'multi_label':
+            visualizer.save_multi_label_visualization(results, methods=methods)
+            video_metrics = calculator.calculate_multi_label_metrics_per_video(results)
+            overall_metrics = calculator.calculate_multi_label_overall_metrics(results)
+        else:
+            visualizer.save_single_label_visualization(results, methods=methods)
+            video_metrics = calculator.calculate_single_label_metrics_per_video(results)
+            overall_metrics = calculator.calculate_single_label_overall_metrics(results)
+
+        save_video_metrics_to_csv(video_metrics, fold_dir, methods=methods)
+        save_overall_metrics_to_csv(overall_metrics, fold_dir / 'fold_results', methods=methods)
+        return overall_metrics
+
     def _get_fold_dir(self, fold_idx: int) -> Path:
         """fold 用のディレクトリを取得"""
         fold_dir = self.config.paths.save_dir_path / f"fold_{fold_idx}"

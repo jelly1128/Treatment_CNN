@@ -1,8 +1,6 @@
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, multilabel_confusion_matrix
+from sklearn.metrics import multilabel_confusion_matrix
 import numpy as np
 from evaluate.result_types import HardMultiLabelResult, SingleLabelResult
-import pandas as pd
-from pathlib import Path
 
 class ClassificationMetricsCalculator:
     def __init__(self, num_classes: int = 15, mode: str = "multitask"):
@@ -80,7 +78,7 @@ class ClassificationMetricsCalculator:
         # クラス数×クラス数の混同行列を計算
         # modeに応じてクラス数を設定
         if self.mode == "multitask":
-            n_classes = 6  # 主クラスの数
+            n_classes = self.num_classes
         elif self.mode == "single_label":
             n_classes = 5
         confusion_matrix = np.zeros((n_classes, n_classes), dtype=int)
@@ -267,57 +265,57 @@ class ClassificationMetricsCalculator:
         # クラス数×クラス数の混同行列を計算
         # modeに応じてクラス数を設定
         if self.mode == "multitask":
-            n_classes = 6  # 主クラスの数
+            n_classes = self.num_classes
         elif self.mode == "single_label":
             n_classes = 5
         class_confusion_matrix = np.zeros((n_classes, n_classes), dtype=int)
-        
+
         # 混同行列を作成
         for t, p in zip(y_true, y_pred):
             class_confusion_matrix[t, p] += 1
-        
+
         # 各クラスの2×2混同行列と精度指標を計算
         per_class_confusion_matrices = []
         class_metrics = []
-        
+
         for class_idx in range(n_classes):
             tp = class_confusion_matrix[class_idx, class_idx]
             fp = np.sum(class_confusion_matrix[:, class_idx]) - tp
             fn = np.sum(class_confusion_matrix[class_idx, :]) - tp
             tn = np.sum(class_confusion_matrix) - tp - fp - fn
-            
+
             per_class_confusion_matrices.append([[tn, fp], [fn, tp]])
-            
+
             precision = tp / (tp + fp) if (tp + fp) > 0 else 0
             recall = tp / (tp + fn) if (tp + fn) > 0 else 0
             f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
             accuracy = (tp + tn) / (tp + fp + tn + fn) if (tp + fp + tn + fn) > 0 else 0
-            
+
             class_metrics.append({
                 'precision': precision,
                 'recall': recall,
                 'f1_score': f1_score,
                 'accuracy': accuracy
             })
-        
+
         return {
             'class_metrics': class_metrics,  # 各クラスの適合率・再現率・F1スコア・正解率
             'per_class_confusion_matrices': np.array(per_class_confusion_matrices),  # 各クラスの2×2混同行列
             'class_confusion_matrix': class_confusion_matrix  # クラス数×クラス数の混同行列
         }
+
             
-    def calculate_all_folds_metrics(self, all_folds_results: dict[str, SingleLabelResult], save_dir: Path):
+    def calculate_all_folds_metrics(self, all_folds_results: dict[str, SingleLabelResult]):
         """
-        全フォールドのスライディングウィンドウ適用後の結果を統合して評価指標を計算し保存します。
-        
+        全フォールドのスライディングウィンドウ適用後の結果を統合して評価指標を計算します。
+
         Args:
             all_folds_results (dict[str, SingleLabelResult]): 全フォールドの結果を含む辞書
-            save_dir (Path): 結果を保存するディレクトリのパス
 
         Returns:
             dict: 全フォールドのメトリクスを格納した辞書
             - class_metrics: 各クラスの適合率・再現率・F1スコア・正解率
-            - per_class_confusion_matrices: 各クラスの2×2混同行列
+            - class_confusion_matrix: クラス数×クラス数の混同行列
         """
         y_true = []
         y_pred = []
@@ -333,11 +331,11 @@ class ClassificationMetricsCalculator:
         # クラス数×クラス数の混同行列を計算
         # modeに応じてクラス数を設定
         if self.mode == "multitask":
-            n_classes = 6  # 主クラスの数
+            n_classes = self.num_classes
         elif self.mode == "single_label":
             n_classes = 5
         class_confusion_matrix = np.zeros((n_classes, n_classes), dtype=int)
-        
+
         # 混同行列を作成
         for t, p in zip(y_true, y_pred):
             class_confusion_matrix[t, p] += 1
@@ -365,28 +363,7 @@ class ClassificationMetricsCalculator:
                 'f1_score': f1_score,
                 'accuracy': accuracy
             })
-        
-        # クラス数×クラス数の混同行列を保存
-        cm_df = pd.DataFrame(
-            class_confusion_matrix,
-            index=[f'True_{i}' for i in range(n_classes)],
-            columns=[f'Pred_{i}' for i in range(n_classes)]
-        )
-        cm_df.to_csv(save_dir / 'confusion_matrix.csv')
-        
-        # クラスごとの評価指標の保存
-        metrics_df = pd.DataFrame([
-            {
-                'Class': i,
-                'Precision': round(metrics['precision'], 4),
-                'Recall': round(metrics['recall'], 4), 
-                'F1 Score': round(metrics['f1_score'], 4),
-                'Accuracy': round(metrics['accuracy'], 4)
-            }
-            for i, metrics in enumerate(class_metrics)
-        ])
-        metrics_df.to_csv(save_dir / 'class_metrics.csv', index=False)
-        
+
         return {
             'class_metrics': class_metrics,
             'class_confusion_matrix': class_confusion_matrix,

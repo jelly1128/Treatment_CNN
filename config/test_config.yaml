@@ -1,10 +1,16 @@
-test:
-  img_size: 224
+mode: test
+
+model:
+  architecture: 'resnet18'
+  type: 'multitask'
   num_classes: 6
-  model_type: 'multitask'
+
+dataset:
+  root: '/home/tanaka/demo_data'
+  img_size: 224
+  batch_size: 1
 
 paths:
-  dataset_root: '/home/tanaka/demo_data'
   save_dir: '6class_resnet18_multitask_anomaly_test'
   model_paths:
     - '6class_resnet18_multitask_anomaly_train/fold_0/best_model.pth'
@@ -12,7 +18,12 @@ paths:
     - '6class_resnet18_multitask_anomaly_train/fold_1/best_model.pth'
     - '6class_resnet18_multitask_anomaly_train/fold_2/best_model.pth'
 
-splits:
+cv_ratio:
+  train: 2
+  val: 1
+  test: 1
+
+cv_splits:
   split1:
     - "20210119093456_000001-001"
     - "20210531112330_000005-001"
